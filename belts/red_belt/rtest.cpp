@@ -1448,6 +1448,307 @@ GET /help HTTP/1.1)");
         }
     }
 
+    int64_t CalculateMatrixSum(const vector<vector<int64_t>>& matrix) {
+        int64_t res = 0;
+
+        vector<future<void>> futures;
+        mutex m;
+        size_t size = matrix.size();
+        size_t i = 0;
+        while (i < size) {
+            futures.push_back(async([i, &m, &res, &matrix](){
+                lock_guard<mutex> lock(m);
+                res = accumulate(matrix[i].begin(), matrix[i].end(), res);
+                }));
+            ++i;   
+        }
+
+        for (auto& future : futures)
+            future.get();
+
+        return res;
+    }
+
+    void test_calculate_matrix_sum() {
+    const vector<vector<int64_t>> matrix = {
+            {1, 2, 3, 4},
+            {5, 6, 7, 8},
+            {9, 10, 11, 12},
+            {13, 14, 15, 16}};
+        assert<int64_t>(CalculateMatrixSum(matrix), 136);
+    }
+
+    void Stats2::operator+=(const Stats2& other) {
+        for(const auto& item : other.word_frequences)
+            word_frequences[item.first] += item.second;
+    }
+
+    Stats2 ExploreLine(const set<string>& key_words, const string& line) {
+        Stats2 res;
+        size_t last_pos = 0;
+        for(size_t i = line.find(" ", last_pos); ;
+            i = line.find(" ", last_pos)) {
+            string word;
+            if (i == string::npos) {
+                word = string(line.begin() + last_pos, line.end());
+            } else {
+                word = string(line.begin() + last_pos, line.begin() + i);
+            }
+            if(key_words.find(word) != key_words.end())
+                res.word_frequences[word] += 1;
+            if(i == string::npos)
+                break;
+            last_pos = i + 1;
+        }
+
+
+        return move(res);
+    }
+
+    Stats2 ExploreKeyWordsSingleThread(
+        const set<string>& key_words, istream& input
+            ) {
+        Stats2 result;
+        for (string line; getline(input, line); ) {
+            result += ExploreLine(key_words, line);
+        }
+        return result;
+    }
+
+    Stats2 ExploreKeyWords(const set<string>& key_words, istream& input) {
+        Stats2 res;
+        vector<future<Stats2>> futures;
+        
+        for (string line; getline(input, line); ) {
+            futures.push_back(async([&key_words, line](){
+                return ExploreLine(key_words, line); }
+                ));
+        }
+
+        for(size_t i = 0; i < futures.size(); ++i) {
+            res += futures[i].get();
+        }
+        
+        return move(res);
+    }
+
+    ostream& operator<<(ostream& os, const map<string, int>& st) {
+        for(const auto& item : st) {
+            os << "first: " << item.first <<
+                " second: " << item.second << "\n";
+        }
+        return os;
+    }
+
+    void test_basic() {
+        const set<string> key_words = {"yangle", "rocks", "sucks", "all"};
+
+        stringstream ss;
+        ss << "this new yangle service really rocks\n";
+        ss << "It sucks when yangle isn't available\n";
+        ss << "10 reasons why yangle is the best IT company\n";
+        ss << "yangle rocks others suck\n";
+        ss << "Goondex really sucks, but yangle rocks. Use yangle\n";
+
+        const auto stats = ExploreKeyWords(key_words, ss);
+        const map<string, int> expected = {
+            {"yangle", 6},
+            {"rocks", 2},
+            {"sucks", 1}
+        };
+        assert(stats.word_frequences, expected);
+    }
+
+    void TestConcurrentUpdate() {
+        Synchronized<string> common_string;
+
+        const size_t add_count = 50000;
+        auto updater = [&common_string, add_count] {
+            for (size_t i = 0; i < add_count; ++i) {
+            auto access = common_string.GetAccess();
+            access.ref_to_value += 'a';
+            }
+        };
+
+        auto f1 = async(updater);
+        auto f2 = async(updater);
+
+        f1.get();
+        f2.get();
+
+        assert(common_string.GetAccess().ref_to_value.size(), 2 * add_count);
+        }
+
+        vector<int> Consume(Synchronized<deque<int>>& common_queue) {
+        vector<int> got;
+
+        for (;;) {
+            deque<int> q;
+
+            {
+            // Мы специально заключили эти две строчки в операторные скобки, чтобы
+            // уменьшить размер критической секции. Поток-потребитель захватывает
+            // мьютекс, перемещает всё содержимое общей очереди в свою
+            // локальную переменную и отпускает мьютекс. После этого он обрабатывает
+            // объекты в очереди за пределами критической секции, позволяя
+            // потоку-производителю параллельно помещать в очередь новые объекты.
+            //
+            // Размер критической секции существенно влияет на быстродействие
+            // многопоточных программ.
+            auto access = common_queue.GetAccess();
+            q = move(access.ref_to_value);
+            }
+
+            for (int item : q) {
+            if (item > 0) {
+                got.push_back(item);
+            } else {
+                return got;
+            }
+            }
+        }
+    }
+
+    void TestProducerConsumer() {
+    Synchronized<deque<int>> common_queue;
+
+    auto consumer = async(Consume, ref(common_queue));
+
+    const size_t item_count = 100000;
+    for (size_t i = 1; i <= item_count; ++i) {
+        common_queue.GetAccess().ref_to_value.push_back(i);
+    }
+    common_queue.GetAccess().ref_to_value.push_back(-1);
+
+    vector<int> expected(item_count);
+    iota(begin(expected), end(expected), 1);
+    assert(consumer.get(), expected);
+    }
+
+    void test_synchronized() {
+        TestConcurrentUpdate();
+        TestProducerConsumer();
+    }
+
+    void RunConcurrentUpdates(
+    ConcurrentMap<int, int>& cm, size_t thread_count, int key_count
+) {
+  auto kernel = [&cm, key_count](int seed) {
+    vector<int> updates(key_count);
+    iota(begin(updates), end(updates), -key_count / 2);
+    shuffle(begin(updates), end(updates), default_random_engine(seed));
+
+    for (int i = 0; i < 2; ++i) {
+      for (auto key : updates) {
+        cm[key].ref_to_value++;
+      }
+    }
+  };
+
+  vector<future<void>> futures;
+  for (size_t i = 0; i < thread_count; ++i) {
+    futures.push_back(async(kernel, i));
+  }
+}
+
+void TestConcurrentUpdate2() {
+  const size_t thread_count = 3;
+  const size_t key_count = 50000;
+
+  ConcurrentMap<int, int> cm(thread_count);
+  RunConcurrentUpdates(cm, thread_count, key_count);
+
+  const auto result = cm.BuildOrdinaryMap();
+  assert(result.size(), key_count);
+  for (auto& [k, v] : result) {
+    assert(v, 6, "Key = " + to_string(k));
+  }
+}
+
+void TestReadAndWrite() {
+  ConcurrentMap<size_t, string> cm(5);
+
+  auto updater = [&cm] {
+    for (size_t i = 0; i < 50000; ++i) {
+      cm[i].ref_to_value += 'a';
+    }
+  };
+  auto reader = [&cm] {
+    vector<string> result(50000);
+    for (size_t i = 0; i < result.size(); ++i) {
+      result[i] = cm[i].ref_to_value;
+    }
+    return result;
+  };
+
+  auto u1 = async(updater);
+  auto r1 = async(reader);
+  auto u2 = async(updater);
+  auto r2 = async(reader);
+
+  u1.get();
+  u2.get();
+
+  for (auto f : {&r1, &r2}) {
+    auto result = f->get();
+    assert(all_of(result.begin(), result.end(), [](const string& s) {
+      return s.empty() || s == "a" || s == "aa";
+    }));
+  }
+}
+
+void TestSpeedup() {
+  {
+    ConcurrentMap<int, int> single_lock(1);
+
+    LogDuration("Single lock");
+    RunConcurrentUpdates(single_lock, 4, 50000);
+  }
+  {
+    ConcurrentMap<int, int> many_locks(100);
+
+    LogDuration("100 locks");
+    RunConcurrentUpdates(many_locks, 4, 50000);
+  }
+}
+
+    void test_in_one_thread() {
+        ConcurrentMap<int, int> single_lock(3);
+        for (size_t i = 0; i < 1000; ++i) {
+            single_lock[i].ref_to_value = i;
+        }
+        assert<size_t>(single_lock.BuildOrdinaryMap().size(), 1000);
+        
+    }
+
+    void test_in_two_thread() {
+        ConcurrentMap<int, int> single_lock(3);
+        std::thread t1([&]() {
+            for (size_t i = 0; i < 1000; ++i) {
+                single_lock[i].ref_to_value = i;
+            }
+        });
+
+        std::thread t2([&]() {
+            for (size_t i = 1000; i < 2000; ++i) {
+                single_lock[i].ref_to_value = i;
+            }
+        });
+
+        t1.join();
+        t2.join();
+
+        assert<size_t>(single_lock.BuildOrdinaryMap().size(), 2000);
+    }
+
+    void test_concurrent_map() {
+        test_in_one_thread();
+        test_in_two_thread();
+        // TestConcurrentUpdeate2();
+        // TestReadAndWrite();
+        // TestSpeedup();
+    }
+
     void fifth_weak() {
         cout << "______Fifth weak______" << endl;
         run_test rt;
@@ -1466,9 +1767,13 @@ GET /help HTTP/1.1)");
         cout << "---------------------" << endl << "7." << endl;
         rt.run(test_priority_collection, "test_priority_collection");
         cout << "---------------------" << endl << "8." << endl;
+        rt.run(test_calculate_matrix_sum, "test_calculate_matrix_sum");
         cout << "---------------------" << endl << "9." << endl;
+        rt.run(test_basic, "test_basic");
         cout << "---------------------" << endl << "10." << endl;
+        rt.run(test_synchronized, "test_synchronized");
         cout << "---------------------" << endl << "11." << endl;
+        rt.run(test_concurrent_map, "test_concurrent_map");
     }
 
     void sixth_weak() {

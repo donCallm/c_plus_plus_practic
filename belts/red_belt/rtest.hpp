@@ -14,6 +14,11 @@
 #include <thread>
 #include <queue>
 #include <cstring>
+#include <future>
+#include <numeric>
+#include <mutex>
+#include <functional>
+#include <memory>
 
 using namespace std;
 
@@ -810,6 +815,106 @@ namespace rbelt {
         }   
         return false;
     }
+
+    struct Stats2 {
+        map<string, int> word_frequences;
+
+        void operator += (const Stats2& other);
+    };
+
+    template <typename T>
+    class Synchronized {
+        public:
+            explicit Synchronized(T initial = T())
+                : _value(initial) {}
+
+            struct Access {
+                Access(T& value, mutex& m)
+                    : ref_to_value(value),
+                    lock(m) {}
+
+                T& ref_to_value;
+                unique_lock<mutex> lock;
+            };
+
+            Access GetAccess() {
+                return Access(_value, _m);
+            }
+        private:
+            T _value;
+            mutex _m;
+    };
+
+    template <typename K, typename V>
+    class ConcurrentMap {
+        public:
+            using count = size_t;
+            using max_elem = int;
+        
+            static_assert(is_integral_v<K>, "ConcurrentMap supports only integer keys");
+
+            struct Access {
+                Access(V& value, mutex& m)
+                    : ref_to_value(value),
+                    lock(m) {}
+
+                V& ref_to_value;
+                unique_lock<mutex> lock;
+            };
+
+            explicit ConcurrentMap(size_t bucket_count)
+                :_mutexes(bucket_count),
+                _ranges(bucket_count) {}
+
+            Access operator[](const K& key) {
+                size_t index = find_chanck_index(key);
+
+                unique_lock<mutex> lock(_mutexes[index].first);
+                if(_elems.find(key) != _elems.end())
+                    return Access(_elems[key], _mutexes[index].second);
+
+                V& to_res = _elems.emplace(make_pair(key, V())).first->second;
+                add_elem(index, key);
+                return Access(to_res, _mutexes[index].second);
+            }
+
+            map<K, V> BuildOrdinaryMap() {
+                return _elems;
+            }
+        private:
+            size_t find_chanck_index(const K& key) {
+                for(size_t i = 0; i < _ranges.size(); ++i) {
+                    if(_ranges[i].size() == 0
+                        || *prev(_ranges[i].end()) <= key)
+                        return i;
+                }
+                throw out_of_range("");
+            }
+            void add_elem(size_t index, const K& key) {
+                _ranges[index].insert(key);
+                if(index != 0)
+                    redistribute_elems(index);
+            }
+            void redistribute_elems(size_t index) {
+                for(; index > 0; --index) {
+                    if(_ranges[index].size() <= _ranges[index - 1].size() * 2)
+                        return;
+                    size_t count_to_move = _ranges[index].size();
+                    size_t i = 0;
+                    for(auto it = _ranges[index].begin();
+                        it != _ranges[index].end() && i < count_to_move;
+                        it = _ranges[index].begin(), ++i) {
+                        _ranges[index - 1].insert(*it);
+                        _ranges[index].erase(it);
+                    }
+                }
+            }
+        private:
+            mutex m;
+            vector<pair<mutex, mutex>> _mutexes;
+            vector<set<K>> _ranges;
+            map<K, V> _elems;
+    };
 
     void fifth_weak();
 
