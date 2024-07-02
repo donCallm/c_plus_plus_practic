@@ -910,7 +910,6 @@ namespace rbelt {
                 }
             }
         private:
-            mutex m;
             vector<pair<mutex, mutex>> _mutexes;
             vector<set<K>> _ranges;
             map<K, V> _elems;
