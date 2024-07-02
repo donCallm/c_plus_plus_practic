@@ -1724,13 +1724,13 @@ void TestSpeedup() {
     void test_in_two_thread() {
         ConcurrentMap<int, int> single_lock(3);
         std::thread t1([&]() {
-            for (size_t i = 0; i < 1000; ++i) {
+            for (size_t i = 0; i < 25000; ++i) {
                 single_lock[i].ref_to_value = i;
             }
         });
 
         std::thread t2([&]() {
-            for (size_t i = 1000; i < 2000; ++i) {
+            for (size_t i = 25000; i < 50000; ++i) {
                 single_lock[i].ref_to_value = i;
             }
         });
@@ -1738,15 +1738,15 @@ void TestSpeedup() {
         t1.join();
         t2.join();
 
-        assert<size_t>(single_lock.BuildOrdinaryMap().size(), 2000);
+        assert<size_t>(single_lock.BuildOrdinaryMap().size(), 50000);
     }
 
     void test_concurrent_map() {
         test_in_one_thread();
         test_in_two_thread();
-        // TestConcurrentUpdeate2();
-        // TestReadAndWrite();
-        // TestSpeedup();
+        // TestConcurrentUpdate2();
+        TestReadAndWrite();
+        TestSpeedup();
     }
 
     void fifth_weak() {

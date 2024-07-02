@@ -867,15 +867,15 @@ namespace rbelt {
                 _ranges(bucket_count) {}
 
             Access operator[](const K& key) {
+                unique_lock<mutex> lock(m);
                 size_t index = find_chanck_index(key);
 
-                unique_lock<mutex> lock(_mutexes[index].first);
                 if(_elems.find(key) != _elems.end())
-                    return Access(_elems[key], _mutexes[index].second);
+                    return Access(_elems[key], _mutexes[index]);
 
                 V& to_res = _elems.emplace(make_pair(key, V())).first->second;
                 add_elem(index, key);
-                return Access(to_res, _mutexes[index].second);
+                return Access(to_res, _mutexes[index]);
             }
 
             map<K, V> BuildOrdinaryMap() {
@@ -910,7 +910,8 @@ namespace rbelt {
                 }
             }
         private:
-            vector<pair<mutex, mutex>> _mutexes;
+            mutex m;
+            vector<mutex> _mutexes;
             vector<set<K>> _ranges;
             map<K, V> _elems;
     };
