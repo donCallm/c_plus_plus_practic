@@ -888,7 +888,7 @@ namespace rbelt {
                         || *prev(_ranges[i].end()) <= key)
                         return i;
                 }
-                throw out_of_range("");
+                return _ranges.size() - 1;
             }
             void add_elem(size_t index, const K& key) {
                 _ranges[index].insert(key);

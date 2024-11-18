@@ -1,4 +1,4 @@
-#include "rtest.hpp"
+#include "rtest.hpp" 
 
 namespace rbelt {    
     template<typename func>
@@ -1744,7 +1744,7 @@ void TestSpeedup() {
     void test_concurrent_map() {
         test_in_one_thread();
         test_in_two_thread();
-        // TestConcurrentUpdate2();
+        TestConcurrentUpdate2();
         TestReadAndWrite();
         TestSpeedup();
     }
