@@ -7,10 +7,7 @@
 template<class T>
 class shared_ptr {
     public:
-        shared_ptr()
-            : _cb(new control_block()),
-            _data(new T())
-        {}
+        shared_ptr() {}
 
         shared_ptr(T* ptr)
             : _cb(new control_block()),
@@ -70,6 +67,13 @@ class shared_ptr {
         T& operator*() const noexcept { return *_data; }
         T* operator->() const noexcept { return _data; }
         T& operator[](size_t index) const { return *(_data + index); }
+        shared_ptr<T>& operator=(const shared_ptr<T>& other) {
+            _cb = other._cb;
+            _data = other._data;
+            ++(_cb->count);
+
+            return *this;
+        }
 
     private:
         struct control_block {

@@ -43,11 +43,13 @@ struct weak_ptr {
     }
 
     ~weak_ptr() {
+        if (_cb == nullptr)
+            return;
+        --(_cb->weak_count);
         if (_cb->weak_count == 0 && _cb->count == 0) {
             delete _cb;
             delete _data;
         }
-        --(_cb->weak_count);
     }
 
     private:
