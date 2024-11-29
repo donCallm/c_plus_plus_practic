@@ -23,14 +23,13 @@ _start:
     decq %rdi       # --rdi
 
     movq $4, %rax
-    mulq $4         # rax *= 4 == 16
+    movq $4, %rbx
+    mulq %rbx       # rax *= rbx == 4 * 4
     movq %rax, %rdi # rdi = rax || rax = 16
 
-    movq $2.5, %rax
-    imulq $2        # rax *= 2 == 5
-
     movq $5, %rax
-    div $2          # rax %= 2 || (rax = 2 && rdx = 5)
+    movq $2, %rbx
+    div $rbx        # rax %= 2 || (rax = 2 && rdx = 5)
     movq %rax, %rdi # rdi = 2
     movq %rdx, %rdi # rdi = 5
 
