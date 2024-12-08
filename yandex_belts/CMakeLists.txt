@@ -1,0 +1,3 @@
+add_subdirectory(white_belt)
+add_subdirectory(yello_belt)
+add_subdirectory(red_belt)
