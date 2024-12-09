@@ -1,13 +1,13 @@
 #include <new>
 #include <cstddef>
 
-constexpr const size_t default_capacity = 100;
+constexpr const size_t default_capacity_la = 100;
 
 template <class T>
 struct linear_alloc {
     using value_type = T;
 
-    linear_alloc(size_t capacity = default_capacity)
+    linear_alloc(size_t capacity = default_capacity_la)
         : _buf(new value_type[capacity]),
         _size(0),
         _capacity(capacity)

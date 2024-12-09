@@ -2,6 +2,7 @@
 #include <cassert>
 #include <vector>
 #include "linear_allocator.hpp"
+#include "pool_alloc.hpp"
 
 void linear_alloc_test() {
     std::cout << "-- LINEAR ALLOC --\n\n";
@@ -41,7 +42,7 @@ void linear_alloc_test() {
 int main() {
     // linear_alloc_test();
 
-    std::vector<int, linear_alloc<int>> v;
+    std::vector<int, pool_alloc<int>> v;
     for(size_t i = 0; i < 100000; ++i)
         v.push_back(i);
 

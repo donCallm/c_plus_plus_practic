@@ -2,38 +2,42 @@
 #include <new>
 #include <list>
 
-constexpr const size_t default_capacity = 1000;
+constexpr const size_t default_capacity_pa = 1000;
 constexpr const size_t one_block_size = 10;
 
 template<class T>
 struct pool_alloc {
     using value_type = T;
 
-    pool_alloc(size_t capacity = default_capacity)
-        : _buf(new value_type[size]),
-        _size(0)
+    pool_alloc(size_t capacity = default_capacity_pa)
+        : _buf(new value_type[capacity]),
+        _capacity(capacity)
     {
-        for (size_t i = 0; i < size; i += one_block_size)
+        for (size_t i = 0; i < capacity; i += one_block_size)
             _pool.emplace_back(block{_buf + i});
     }
+
+    ~pool_alloc() { delete[] _buf; }
 
 public:
     value_type* allocate(size_t count) {
         if ((count / one_block_size) < _pool.size()) {
             int index = find_free_blocs(count);
             if (index == -1)
-                realloc(count);
+                return realloc(count);
+
             prepare_blocks(index, count, operation::reserv);
-            return _pool[index].value;
+            return get_block(index)->value;
         } else {
-            return reallo(count);
+            return realloc(count);
         }
     }
 
-    void dealocate(value_type*& ptr, size_t count) {
+    void deallocate(value_type*& ptr, size_t count) {
         if(ptr) {
-            if (ptr < _buf && ptr > _buf + (_pool.size() * one_block_size))
+            if (ptr < _buf || ptr > _buf + _capacity) {
                 delete[] ptr;
+            }
             else {
                 size_t index = find_block(ptr);
                 prepare_blocks(index, count, operation::free);
@@ -42,49 +46,22 @@ public:
         }
     }
 
-private:
-    value_type* realloc(size_t count) const {
-        return new value_type[count];
-    }
-
-    int find_free_blocs(size_t count) const {
-        size_t free_count = -1;
-        for(size_t i = 0; i < _size) {
-            if (_pool[i].free) {
-                ++free_count;
-                if (free_count == count)
-                    return free_count;
+    template<typename ...Args>
+    void construct(value_type*& ptr, Args&&... args) {
+        if (ptr) {
+            if (ptr < _buf && ptr > _buf + _capacity) {
+                delete[] ptr;
             } else {
-                free_count = 0;
+                size_t index = find_block(ptr);
+                prepare_blocks(index, 1, operation::free);
             }
+            ptr = nullptr;
         }
+        ptr = new value_type(std::forward<Args>(args)...);
     }
 
-    void prepare_blocks(size_t index, size_t count, opration op) {
-        switch (op)
-        {
-            case operation::reserv: {
-                for(size_t i = 0; i < count; ++i)
-                    _pool[i].free = false;
-                break;
-            }
-            case operation::free: {
-                for(size_t i = 0; i < count; ++i)
-                _pool[i].free = true;
-                break;
-            }
-            
-            default:
-                break;
-        }
-    }
-
-    int find_block(const value_type* ptr) const {
-        for(size_t i = 0; i < _pool.size(); i += one_block_size) {
-            if (ptr >= _pool[i].value && ptr < ptr[i + one_block_size])
-                return i;
-        }
-        return -1;
+    void destruct(value_type* ptr) {
+        ptr->~value_type();
     }
 
 private:
@@ -99,7 +76,70 @@ private:
     };
 
 private:
+    value_type* realloc(size_t count) const {
+        return new value_type[count];
+    }
+
+    int find_free_blocs(size_t count) const {
+        size_t free_count = -1;
+        size_t i = 0;
+        for(auto it = _pool.begin(); it != _pool.end() && i < _pool.size(); ++it, ++i) {
+            if (it->free) {
+                if (++free_count == count)
+                    return i - free_count;
+            } else {
+                free_count = 0;
+            }
+        }
+        return -1;
+    }
+
+    void prepare_blocks(size_t index, size_t count, operation op) {
+        size_t i = 0;
+        switch (op)
+        {
+            case operation::reserv: {
+                for(auto it = _pool.begin(); it != _pool.end() && i < count; ++it, ++i)
+                    it->free = false;
+                break;
+            }
+            case operation::free: {
+                
+                for(auto it = _pool.begin(); it != _pool.end() && i < count; ++it, ++i)
+                    it->free = true;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    int find_block(const value_type* ptr) const {
+        size_t i = 0;
+        for(auto it = _pool.begin(); it != _pool.end(); ++it, ++i) {
+            if (ptr >= it->value && ptr < (it->value + one_block_size))
+                return i;
+        }
+        return -1;
+    }
+
+    block* get_block(size_t index) {
+        if (_pool.size() < index)
+            return nullptr;
+        
+        size_t i = 0;
+        auto it = _pool.begin();
+
+        while(it != _pool.end() && i < index) {
+            ++it;
+            ++i;
+        }
+        
+        return &(*it);
+    }
+
+private:
     value_type*      _buf;
     std::list<block> _pool;
-    size_t           _size;
+    size_t           _capacity;
 };
