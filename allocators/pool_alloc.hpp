@@ -3,7 +3,6 @@
 #include <list>
 
 constexpr const size_t default_capacity_pa = 1000;
-constexpr const size_t one_block_size = 10;
 
 template<class T>
 struct pool_alloc {
@@ -13,15 +12,15 @@ struct pool_alloc {
         : _buf(new value_type[capacity]),
         _capacity(capacity)
     {
-        for (size_t i = 0; i < capacity; i += one_block_size)
-            _pool.emplace_back(block{_buf + i});
+        for (size_t i = 0; i < capacity; ++i)
+            _pool.emplace_back(block{_buf + sizeof(value_type)});
     }
 
     ~pool_alloc() { delete[] _buf; }
 
 public:
     value_type* allocate(size_t count) {
-        if ((count / one_block_size) < _pool.size()) {
+        if (count < _pool.size()) {
             int index = find_free_blocs(count);
             if (index == -1)
                 return realloc(count);
@@ -117,7 +116,7 @@ private:
     int find_block(const value_type* ptr) const {
         size_t i = 0;
         for(auto it = _pool.begin(); it != _pool.end(); ++it, ++i) {
-            if (ptr >= it->value && ptr < (it->value + one_block_size))
+            if (ptr >= it->value && ptr < it->value + sizeof(value_type))
                 return i;
         }
         return -1;
