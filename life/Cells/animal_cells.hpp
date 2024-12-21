@@ -27,7 +27,6 @@ struct EpithalialCells
     
     void feel() {      // exampl: to smell or taste
     
-
     }
 };
 
@@ -35,27 +34,48 @@ struct MuscleCells
             : AnimalCell
 {
     void shrink() {
-
+        _is_shrink = true;
     }
+
+    void relax() {
+        _is_shrink = false;
+    }
+
+private:
+    bool _is_shrink;
 };
 
 struct Neurons
             : AnimalCell
 {
-    void send_signal() {            // transfer information to another cell
+    Neurons(std::shared_ptr<Neurons> n) {
+        _sinaps.left_neighbor = n;
+        n->_sinaps.right_neighbor = std::shared_ptr(this);
+    }
 
+    void send_signal(int& signal) {                   // transfer information to another cell
+        _sinaps->right_neighbor->send_signal(signal);
     }
     
-    void response_to_irritant () {  // Feel the touch
-
+    void response_to_irritant (int& irritant) {       // Feel the touch
+        _sinaps->right_neighbor->send_signal(irritant);
     }
 
-    void information_processing() {
-
+    void information_processing(int& new_info) {
+        _info.push_back(new_info);
+        _sinaps->righ_neighbor->information_processing(new_info);
     }
 
 private:
-    vector<> _info;
+    struct sinaps {
+        Neurons std::shared_ptr<right_neighbor>;
+        Neurons std::shhared_ptr<left_neighbor>;
+    };
+
+private:
+    bool _is_live;
+    sinaps   _sinaps;
+    std::vector<int> _info;
 };
 
 struct BloodCells
