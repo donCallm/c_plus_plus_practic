@@ -1,8 +1,15 @@
 #pragma once
 
+#include <variant>
 #include "cells.hpp"
 
+using warmth = size_t;
+using sweat = size_t;
+
 // добавить возможность при делении стать раковой и подумать о логике
+constexpr const size_t NORMAL_TEMP = 36;
+constexpr const size_t MAX_TEMP = 42;
+constexpr const size_t MIN_TEMP = 24;
 
 struct AnimalCell
             : Eukaryotes
@@ -118,23 +125,48 @@ struct PigmentCells
 struct ImmuneCells
             : AnimalCell
 {
-    void recognize_malicious_cells() {
-
+    void recognize_malicious_cells(std::shared_ptr<Cell> suspicious_cell) {
+        if (is_correct_cell(typeid(*checked).name())) {
+            return;
+        }
+        destroy_harmful_cells(std::shared_ptr<Cell> suspicious_cell);
     }
 
-    void destroy_harmful_cells() {
+    
 
+private:
+    void destroy_harmful_cells(std::shared_ptr<Cell> cell) {        // нужно сделать так, что бы из листа удалялись клетки, у которых нет соседей
+        cell->_thread.right_neighbor = cell->_thread.left_neighbor;
+        cell->_thread.right_neighbor = nullptr;
+        cell->_thread.lef_neighbor = cell->_thread.right_neighbor;
+        cell->_thread.lef_neighbor = nullptr;
     }
 };
 
 struct SkinCells
             : AnimalCell
 {
-    void get_irritant() {
+    void get_irritant(int signal) {
+        if (_neuron->_is_live)
+            _neuron->response_to_irritant(signal);
+    }
+
+    std::variant<warmth, sweat> temperature_control() {
+        if (_temp == NORMAL_TEMP)
+            return;
+        else if (_temp > NORMAL_TEMP && _temp < MAX_TEMP)
+            // выделить пот
+        else if ()
+            tremble();
+    }
+
+private:
+    warmth tremble() {
 
     }
 
-    void temperature_control() {
-
-    }
+private:
+    std::shared_ptr<Neurons>         _neuron; // по идее должен быть еще промежуточный слой в виде рецптора, но не вижу пока смысла усложнять
+    std::shared_ptr<EpithalialCells> _epithalial;
+    size_t                          _temp;
 };
