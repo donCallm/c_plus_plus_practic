@@ -26,8 +26,7 @@ struct Eukaryotes;
 struct Prokaryotes;
 struct CancerCell;
 
-template <class Nut = DefaultNutrient>
-using Nutrients = std::vector<std::unique_ptr<Nut>>;
+using Nutrients = std::vector<std::unique_ptr<DefaultNutrient>>;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
@@ -62,7 +61,8 @@ struct Cell
         Circle,        // default
         Square,
         RodShaped,
-        SpiralShaped
+        SpiralShaped,
+        Elongated
     };
 
     enum Type {
@@ -96,7 +96,7 @@ struct Cell
         число раз, наберут нужное количество
         энергии и умрут.
     */
-    virtual void feed(Nutrients<>&) = 0;
+    virtual void feed(Nutrients&) = 0;
     virtual std::shared_ptr<Cell> splitting() = 0;
     size_t ata() { return _ata; }
     bool enough_energy() {
@@ -131,7 +131,7 @@ struct Prokaryotes
         return _cf->splitting_prokaryotes(std::static_pointer_cast<Prokaryotes>(shared_from_this()));
     }
 
-    void feed(Nutrients<DefaultNutrient>& nuts) override {
+    void feed(Nutrients& nuts) override {
         for (auto& nut : nuts)
             increace_energy(nut->value());
     }
@@ -167,7 +167,7 @@ struct Eukaryotes
         }
     }
 
-    virtual void feed(Nutrients<>&) override = 0;
+    virtual void feed(Nutrients&) override = 0;
     virtual std::shared_ptr<Cell> splitting() override = 0;
 
 public:
@@ -181,20 +181,18 @@ struct CancerCell
         : Eukaryotes
 {
     CancerCell()
-        : Eukaryotes()
+        : Eukaryotes(MIN_CELL_ENERGY, Shape::Circle, Type::CancerCell)
     {}
 
     CancerCell(std::shared_ptr<CancerCell> other)
-        : Eukaryotes((other->_ata / 2), Shape::Circle, Type::CancerCell)
-    {
-        other->energy_reduction();
-    }
+        : Eukaryotes(other)
+    {}
 
     std::shared_ptr<Cell> splitting() override {
         return _cf->splitting_eukaryotes<CancerCell>(std::static_pointer_cast<CancerCell>(shared_from_this()));
     }
 
-    void feed(Nutrients<DefaultNutrient>& _nuts) override {
+    void feed(Nutrients& _nuts) override {
         size_t i = _nuts.size();
         while (i > 0) {
             if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <typeinfo>
 
 constexpr const size_t DEFAULT_VAL = 1;
 constexpr const size_t PROTEIN_VAL = 4;
@@ -14,6 +15,7 @@ struct DefaultNutrient {
     {}
 
     size_t value() { return _nutritional_value; }
+    virtual const std::type_info& get_type() { return typeid(DefaultNutrient); }
 
 private:
     const size_t _nutritional_value;
@@ -25,6 +27,8 @@ struct Nutrient
     Nutrient(size_t val = DEFAULT_VAL)
         : DefaultNutrient(val)
     {}
+
+    virtual const std::type_info& get_type() override { return typeid(Nutrient); }
 };
 
 struct Protein
@@ -33,14 +37,18 @@ struct Protein
     Protein()
         : Nutrient(PROTEIN_VAL)
     {}
+
+    const std::type_info& get_type() override { return typeid(Protein); }
 };
 
-struct FAT
+struct Fat
             : Nutrient
 {
-    FAT()
+    Fat()
         : Nutrient(FAT_VAL)
     {}
+
+    const std::type_info& get_type() override { return typeid(Fat); }
 };
 
 struct Carb
@@ -49,6 +57,8 @@ struct Carb
     Carb()
         : Nutrient(CARB_VAL)
     {}
+
+    const std::type_info& get_type() override { return typeid(Carb); }
 };
 
 struct LightEnergi
@@ -57,4 +67,6 @@ struct LightEnergi
     LightEnergi()
         : DefaultNutrient(LIGHT_VAL)
     {}
+
+    const std::type_info& get_type() override { return typeid(LightEnergi); }
 };

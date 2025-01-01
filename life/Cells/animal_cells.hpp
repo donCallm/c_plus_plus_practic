@@ -1,7 +1,9 @@
 #pragma once
 
 #include <variant>
+#include <typeinfo>
 #include "cells.hpp"
+#include <iostream>
 
 using warmth = size_t;
 using sweat = size_t;
@@ -11,20 +13,46 @@ constexpr const size_t NORMAL_TEMP = 36;
 constexpr const size_t MAX_TEMP = 42;
 constexpr const size_t MIN_TEMP = 24;
 
+const std::type_info& PROTEIN_ID = typeid(Protein);
+const std::type_info& FAT_ID = typeid(Fat);
+const std::type_info& CARB_ID = typeid(Carb);
+
 struct AnimalCell
             : Eukaryotes
 {
-    void feed(Nutrients<Nutrient>^=& _nuts) override {
+    AnimalCell()
+        : Eukaryotes(MIN_CELL_ENERGY, Shape::Circle, Type::Animal)
+    {}
+
+    AnimalCell(std::shared_ptr<AnimalCell> other)
+        : Eukaryotes((other->_ata / 2), other->_shape, other->_type)
+    {
+        other->energy_reduction();
+    }
+
+    virtual std::shared_ptr<Cell> splitting() override = 0;
+    void feed(Nutrients& _nuts) override {
+        if (_nuts.size() < 0)
+            return;
+
+        const std::type_info& nut_id = _nuts[0]->get_type();
+        if (nut_id != PROTEIN_ID && nut_id != FAT_ID && nut_id != CARB_ID) {
+            std::cout << "HERE" << std::endl;
+            return;
+        }
+        
         size_t i = _nuts.size();
         while (i > 0) {
-            if (this->_tread.right_neighbor->_ata < this->_ata) {
-                this->_tread.right_neighbor->feed(_nuts);
+            if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
+                this->thread.right_neighbor->feed(_nuts);
                 return;
             }
             --i;
-            std::unique_ptr<DefaultNutrient> nut = _nuts.pop_back();
-            increace_energy(nut->value());
-        }   
+            std::unique_ptr<Nutrient> nut = std::unique_ptr<Nutrient>(static_cast<Nutrient*>(_nuts[i].release()));
+            _nuts.erase(_nuts.begin() + i);
+            size_t temp = nut->value();
+            this->increace_energy(temp);
+        }
     }
 };
 
@@ -44,20 +72,32 @@ struct AnimalCell
 //     }
 // };
 
-// struct MuscleCells
-//             : AnimalCell
-// {
-//     void shrink() {
-//         _is_shrink = true;
-//     }
+struct MuscleCells
+            : AnimalCell
+{
+    MuscleCells()
+        : AnimalCell()
+    {}
 
-//     void relax() {
-//         _is_shrink = false;
-//     }
+    MuscleCells(std::shared_ptr<MuscleCells> other)
+        : AnimalCell(other)
+    {}
 
-// private:
-//     bool _is_shrink;
-// };
+    std::shared_ptr<Cell> splitting() override {
+        return _cf->splitting_eukaryotes<MuscleCells>(std::static_pointer_cast<MuscleCells>(shared_from_this()));
+    }
+
+    void shrink() {
+        _is_shrink = true;
+    }
+
+    void relax() {
+        _is_shrink = false;
+    }
+
+private:
+    bool _is_shrink;
+};
 
 // struct Neurons
 //             : AnimalCell
