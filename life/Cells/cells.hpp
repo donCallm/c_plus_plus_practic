@@ -18,8 +18,8 @@
 
 #define NotEnoughEnergy nullptr
 
-constexpr const size_t MIN_CELL_ENERGY = 7;
-constexpr const float INCREASE_TO_SPLIT = 2.5;
+constexpr const size_t MIN_CELL_ENERGY = 6;
+constexpr const size_t INCREASE_TO_SPLIT = 2;
 
 struct Cell;
 struct Eukaryotes;
@@ -28,11 +28,6 @@ struct CancerCell;
 
 template <class Nut = DefaultNutrient>
 using Nutrients = std::vector<std::unique_ptr<Nut>>;
-
-// using NewProkaryotes = std::optional<std::shared_ptr<Prokaryotes>>;
-
-// template <typename EukaryotesType>
-// using NewEukaryotes = std::optional<std::shared_ptr<EukaryotesType>>;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
@@ -44,7 +39,6 @@ struct CytoplasmThread {                          // для соединения
     std::shared_ptr<EukaryotesType> right_neighbor = nullptr;
     std::shared_ptr<EukaryotesType> left_neighbor = nullptr;
 };
-
 
 struct CellFactory {
     friend struct Cell;
@@ -79,11 +73,11 @@ struct Cell
     };
 
     Cell(size_t ata, Shape shape = Shape::Circle, Type type_ = Type::Prokaryotes)
-        : _shape(shape),
-        _type(type_)
-    {
-        _ata = ata - (ata / INCREASE_TO_SPLIT);
-    }
+        : _cf(std::make_unique<CellFactory>()),
+        _shape(shape),
+        _type(type_),
+        _ata(ata)
+    {}
 
     virtual ~Cell() {}
     /*
@@ -106,7 +100,7 @@ struct Cell
     virtual std::shared_ptr<Cell> splitting() = 0;
     size_t ata() { return _ata; }
     bool enough_energy() {
-        return (_ata / INCREASE_TO_SPLIT) >= MIN_CELL_ENERGY;
+        return (_ata / INCREASE_TO_SPLIT) > MIN_CELL_ENERGY;
     }
 
 protected:
@@ -187,11 +181,11 @@ struct CancerCell
         : Eukaryotes
 {
     CancerCell()
-        : Eukaryotes(10, Shape::Circle, Type::CancerCell)
+        : Eukaryotes()
     {}
 
     CancerCell(std::shared_ptr<CancerCell> other)
-        : Eukaryotes(other->_ata, Shape::Circle, Type::CancerCell)
+        : Eukaryotes((other->_ata / 2), Shape::Circle, Type::CancerCell)
     {
         other->energy_reduction();
     }
@@ -218,18 +212,16 @@ struct CancerCell
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
 std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<EukaryotesType> other) {
-        if (!other->enough_energy()) {
+    if (!other->enough_energy())
         return NotEnoughEnergy;
-    }
 
     auto new_cell = std::make_shared<EukaryotesType>(other);
-    add_thread(other, new_cell); // может это нужно делать в конструкторе?
+    add_thread(other, new_cell);
     return new_cell;
 }
 
 std::shared_ptr<Cell> CellFactory::splitting_prokaryotes(std::shared_ptr<Prokaryotes> other) {
-    if (!other->enough_energy()) {
-        return std::make_shared<Prokaryotes>(other);
-    }
-    return NotEnoughEnergy;
+    if (!other->enough_energy())
+        return NotEnoughEnergy;
+    return std::make_shared<Prokaryotes>(other);
 }
