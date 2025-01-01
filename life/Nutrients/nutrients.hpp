@@ -12,8 +12,11 @@ struct DefaultNutrient {
     DefaultNutrient(size_t val = DEFAULT_VAL)
         : _nutritional_value(val)
     {}
-    
-    unsigned int _nutritional_value;
+
+    size_t value() { return _nutritional_value; }
+
+private:
+    const size_t _nutritional_value;
 };
 
 struct Nutrient
