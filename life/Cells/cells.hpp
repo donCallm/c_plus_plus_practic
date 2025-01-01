@@ -16,14 +16,12 @@
     угодно раз.
 */
 
-#define NotEnoughEnergy std::nullopt
+#define NotEnoughEnergy nullptr
 
 constexpr const size_t MIN_CELL_ENERGY = 7;
 constexpr const float INCREASE_TO_SPLIT = 2.5;
 
-template <typename T>
 struct Cell;
-template <typename T>
 struct Eukaryotes;
 struct Prokaryotes;
 struct CancerCell;
@@ -31,13 +29,13 @@ struct CancerCell;
 template <class Nut = DefaultNutrient>
 using Nutrients = std::vector<std::unique_ptr<Nut>>;
 
-using NewProkaryotes = std::optional<std::shared_ptr<Prokaryotes>>;
+// using NewProkaryotes = std::optional<std::shared_ptr<Prokaryotes>>;
 
-template <typename EukaryotesType>
-using NewEukaryotes = std::optional<std::shared_ptr<EukaryotesType>>;
+// template <typename EukaryotesType>
+// using NewEukaryotes = std::optional<std::shared_ptr<EukaryotesType>>;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename EukaryotesType = Eukaryotes<CancerCell>>
+template <typename EukaryotesType = Eukaryotes>
 struct CytoplasmThread {                          // для соединения клеток одного типа
     bool has_two_neighbors()  { return (right_neighbor && left_neighbor) ? true : false; }
     bool has_right_neighbor() { return (right_neighbor) ? true : false; }
@@ -49,27 +47,23 @@ struct CytoplasmThread {                          // для соединения
 
 
 struct CellFactory {
-    friend struct Cell<Prokaryotes>;
+    friend struct Cell;
 
-    template <typename Type>
-    NewEukaryotes<Type> splitting_eukaryotes(std::shared_ptr<Type> other);
-
-    NewProkaryotes splitting_prokaryotes(std::shared_ptr<Prokaryotes> other);
+    template <typename EukaryotesType = Eukaryotes>
+    std::shared_ptr<Cell> splitting_eukaryotes(std::shared_ptr<EukaryotesType> other);
+    std::shared_ptr<Cell> splitting_prokaryotes(std::shared_ptr<Prokaryotes> other);
 
 private:
-    template <typename EukaryotesType = Eukaryotes<CancerCell>>
+    template <typename EukaryotesType = Eukaryotes>
     void add_thread(std::shared_ptr<EukaryotesType> old_cell, std::shared_ptr<EukaryotesType> new_cell) {
         old_cell->thread.right_neighbor = new_cell;
         new_cell->thread.left_neighbor = old_cell;
     }
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename T>
 struct Cell
-            : std::enable_shared_from_this<T>
+            : std::enable_shared_from_this<Cell>
 {
-    using NewCell = std::optional<std::shared_ptr<Cell<T>>>;
-
     enum Shape {
         Circle,        // default
         Square,
@@ -109,7 +103,7 @@ struct Cell
         энергии и умрут.
     */
     virtual void feed(Nutrients<>&) = 0;
-    virtual NewCell splitting() = 0;
+    virtual std::shared_ptr<Cell> splitting() = 0;
     size_t ata() { return _ata; }
     bool enough_energy() {
         return (_ata / INCREASE_TO_SPLIT) >= MIN_CELL_ENERGY;
@@ -127,10 +121,10 @@ protected:
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct Prokaryotes
-            : Cell<Prokaryotes>
+            : Cell
 {
     Prokaryotes()
-        : Cell(MIN_CELL_ENERGY, Cell<Prokaryotes>::Shape::Circle, Cell<Prokaryotes>::Type::Prokaryotes)
+        : Cell(MIN_CELL_ENERGY, Cell::Shape::Circle, Cell::Type::Prokaryotes)
     {}
 
     Prokaryotes(std::shared_ptr<Prokaryotes> other)
@@ -139,8 +133,8 @@ struct Prokaryotes
         other->energy_reduction();
     }
 
-    NewCell splitting() override {
-        return _cf->splitting_prokaryotes(shared_from_this());
+    std::shared_ptr<Cell> splitting() override {
+        return _cf->splitting_prokaryotes(std::static_pointer_cast<Prokaryotes>(shared_from_this()));
     }
 
     void feed(Nutrients<DefaultNutrient>& nuts) override {
@@ -149,20 +143,19 @@ struct Prokaryotes
     }
 };
 
-template <typename U>
 struct Eukaryotes
-            : Cell<U>
+            : Cell
 {
     Eukaryotes()
-        : Cell<U>(MIN_CELL_ENERGY, Cell<U>::Shape::Circle, Cell<U>::Type::Plant)
+        : Cell(MIN_CELL_ENERGY, Cell::Shape::Circle, Cell::Type::Plant)
     {}
 
-    Eukaryotes(size_t ata, Cell<U>::Shape shape, Cell<U>::Type type)
-        : Cell<U>(ata, shape, type)
+    Eukaryotes(size_t ata, Cell::Shape shape, Cell::Type type)
+        : Cell(ata, shape, type)
     {}
 
     Eukaryotes(std::shared_ptr<Eukaryotes> other)
-        : Cell<U>(other->_ata, other->_shape, other->_type)
+        : Cell(other->_ata, other->_shape, other->_type)
     {
         other->energy_reduction();
     }
@@ -181,7 +174,7 @@ struct Eukaryotes
     }
 
     virtual void feed(Nutrients<>&) override = 0;
-    virtual Cell<U>::NewCell splitting() override = 0;
+    virtual std::shared_ptr<Cell> splitting() override = 0;
 
 public:
     CytoplasmThread<Eukaryotes> thread;
@@ -191,7 +184,7 @@ protected:
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct CancerCell
-        : Eukaryotes<CancerCell>
+        : Eukaryotes
 {
     CancerCell()
         : Eukaryotes(10, Shape::Circle, Type::CancerCell)
@@ -203,8 +196,8 @@ struct CancerCell
         other->energy_reduction();
     }
 
-    NewCell splitting() override {
-        return _cf->splitting_eukaryotes<CancerCell>(shared_from_this());
+    std::shared_ptr<Cell> splitting() override {
+        return _cf->splitting_eukaryotes<CancerCell>(std::static_pointer_cast<CancerCell>(shared_from_this()));
     }
 
     void feed(Nutrients<DefaultNutrient>& _nuts) override {
@@ -223,23 +216,20 @@ struct CancerCell
     }
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename Type>
-NewEukaryotes<Type> CellFactory::splitting_eukaryotes(std::shared_ptr<Type> other) {
+template <typename EukaryotesType = Eukaryotes>
+std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<EukaryotesType> other) {
         if (!other->enough_energy()) {
         return NotEnoughEnergy;
     }
 
-    auto new_cell = std::make_shared<Type>(other);
+    auto new_cell = std::make_shared<EukaryotesType>(other);
     add_thread(other, new_cell); // может это нужно делать в конструкторе?
     return new_cell;
 }
 
-NewProkaryotes CellFactory::splitting_prokaryotes(std::shared_ptr<Prokaryotes> other) {
-    if (auto prokaryote = std::dynamic_pointer_cast<Prokaryotes>(other)) {
-        if (!prokaryote->enough_energy()) {
-            return std::make_shared<Prokaryotes>(other);
-        }
-        return NotEnoughEnergy;
+std::shared_ptr<Cell> CellFactory::splitting_prokaryotes(std::shared_ptr<Prokaryotes> other) {
+    if (!other->enough_energy()) {
+        return std::make_shared<Prokaryotes>(other);
     }
     return NotEnoughEnergy;
 }
