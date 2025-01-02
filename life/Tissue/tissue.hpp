@@ -1,21 +1,61 @@
-// #pragma once
+#pragma once
 
-// #include <type_traits>
-// #include "Cells/cells.hpp"
+#include <list>
+#include <vector>
+#include <future>
+#include "../Cells/animal_cells.hpp"
 
-// constexpr const bool CONNECTED_BY_CYTOPLASM = true;
+constexpr size_t DEFAULT_MAX_CELLS_COUNT = 100;
 
-// template <bool Connected = true, class CellType = Cell>
-// using Cell_with_thread =
-//     std::pair<std::integral_constant<bool, Connected>,CellType>;
+struct Tissue {
+    const size_t MAX_CELLS_COUNT;
 
-// template <class CellType = Cell>
-// using Cells =
-//     std::vector<std::unique_ptr<Cell_with_thread<CONNECTED_BY_CYTOPLASM, Cell>>>;
+    Tissue(size_t max_cells = DEFAULT_MAX_CELLS_COUNT)
+        : MAX_CELLS_COUNT(max_cells),
+        _cells(MAX_CELLS_COUNT)
+    {}
 
-// struct DefaultTissue {
+    void recovery() {
+        if (_cells.size() != MAX_CELLS_COUNT) {
+            for (std::shared_ptr<Eukaryotes> c : _cells) {
+                if (auto new_cell = std::static_pointer_cast<Eukaryotes>(c->splitting()))
+                    _cells.push_back(new_cell);
+                else
+                    break;
+            }
+        }
+    }
 
-    
-// protected:
-//     Cells<Cell> _cells;
-// };
+protected:
+    std::list<std::shared_ptr<Eukaryotes>> _cells;
+};
+
+struct Muscles
+            : Tissue
+{
+    Muscles()
+        : Tissue()
+    {}
+
+    void shrink() {
+        std::vector<std::future<void>> futures;
+        for (std::shared_ptr<Eukaryotes> c : _cells) {
+            std::shared_ptr<MuscleCells> temp = std::static_pointer_cast<MuscleCells>(c);
+            futures.push_back(std::async(std::launch::async, &MuscleCells::shrink, &(*temp)));
+        }
+        for(auto& f : futures) {
+            f.get();
+        }
+    }
+
+    void relax() {
+        std::vector<std::future<void>> futures;
+        for (std::shared_ptr<Eukaryotes> c : _cells) {
+            std::shared_ptr<MuscleCells> temp = std::static_pointer_cast<MuscleCells>(c);
+            futures.push_back(std::async(std::launch::async, &MuscleCells::relax, &(*temp)));
+        }
+        for(auto& f : futures) {
+            f.get();
+        }
+    }
+};

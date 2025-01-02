@@ -1,5 +1,6 @@
 #include "tests.hpp"
 #include "../Cells/animal_cells.hpp"
+#include "../Tissue/tissue.hpp"
 #include <iostream>
 #include <assert.h>
 
@@ -173,6 +174,20 @@ void test_animal_cells() {
     }
 }
 
+void test_tissue() {
+    std::cout << "TestAnimalCells\n";
+    try
+    {
+        std::shared_ptr<Muscles> tissue = std::make_shared<Muscles>();
+        std::cout << "\t:complete;\n";
+    }
+    catch(const std::exception& e)
+    {
+        std::cout << "\t:MusclesCells - error;\n";
+    }
+    
+}
+
 void test_cells() {
     default_functional();
     test_prokaryotes();
@@ -181,4 +196,5 @@ void test_cells() {
 
 void test() {
     test_cells();
+    test_tissue();
 }
