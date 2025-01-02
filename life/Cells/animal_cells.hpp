@@ -87,10 +87,20 @@ struct MuscleCells
 
     void shrink() {
         _is_shrink = true;
+        while (_is_shrink && _oxygen_amount > MIN_CELL_OXYGEN && _ata > MIN_CELL_ENERGY) {
+            spend_energy_for_work();
+        }
+        relax();
     }
 
     void relax() {
         _is_shrink = false;
+    }
+
+private:
+    void spend_energy_for_work() {
+        _oxygen_amount -= 2;
+        _oxygen_amount -= 2;
     }
 
 private:
@@ -130,13 +140,59 @@ private:
 //     std::vector<int> _info;
 // };
 
-// struct BloodCells
-//             : AnimalCell
-// {
-//     void substance_transfer() { // для начала кислород
 
-//     }
-// };
+/*
+    Клетка крови будет брать в себя кислород
+    и передавать его другой клетке. Из-за
+    этого у нее должно быть больше кислорода.
+    Я представляю поток крови как массив клеток,
+    каждая клетка берет себе кислород,
+    пока у соседа справа его меньше, потом
+    он его передаст соседу и тд.
+    Клетка крови будет идти по массиву других клеток
+    и отдавать кислород, пока у принимающей клетки
+    кислорода меньше, потом соседу (везде +- такая логика)
+*/
+
+struct BloodCells
+            : AnimalCell
+{
+    BloodCells()
+        : AnimalCell()
+    {}
+
+    BloodCells(std::shared_ptr<Cell> other)
+        : AnimalCell(other)
+    {}
+
+    std::shared_ptr<Cell> splitting() override {
+        return _cf->splitting_eukaryotes<MuscleCells>(shared_from_this());
+    }
+
+    void substance_transfer(std::shared_ptr<AnimalCell> c) { // для начала кислород
+        if (oxygen_pool == 0) {
+            return;
+        }
+        if (!c->thread.has_right_neighbor()) {
+            c->breath(oxygen_pool);
+            oxygen_pool = 0;
+            return;
+        } else if (c->oxygen() < c->thread.right_neighbor->oxygen()) {
+            size_t to_transfer = (c->oxygen() - c->thread.right_neighbor->oxygen()) * 2;
+            (to_transfer > oxygen_pool) ? c->breath(oxygen_pool) : c->breath(to_transfer);
+            if (to_transfer < oxygen_pool)
+                oxygen_pool -= to_transfer;
+            else
+                oxygen_pool = 0;
+            
+            return;
+        }
+    }
+
+    void get_oxygen(size_t oxygen_count) { oxygen_pool += oxygen_count; }
+
+    size_t oxygen_pool;
+};
 
 // struct ConnectiveCells
 //             : AnimalCell

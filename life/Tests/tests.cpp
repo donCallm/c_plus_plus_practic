@@ -41,10 +41,19 @@ void default_functional() {
         fill_nuts<DefaultEnergySource>(nuts, 10);
         cell->feed(nuts);
 
-        // try split cell with enought energy
+        // try split cell without oxygen
+        {
+            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            assert(new_cell == nullptr);
+        }
+
+        cell->breath(10);
+
+        // success split
         {
             std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
             assert(new_cell != nullptr);
+            cell->thread.right_neighbor = nullptr;
         }
 
         std::cout << "\t:complete;\n";
@@ -73,16 +82,24 @@ void test_prokaryotes() {
 
         // try split cell witout energy
         {
-            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            std::shared_ptr<Prokaryotes> new_cell = std::static_pointer_cast<Prokaryotes>(cell->splitting());
             assert(new_cell == nullptr);
         }
 
         fill_nuts<DefaultEnergySource>(nuts, 10);
         cell->feed(nuts);
 
-        // try split cell with enought energy
+        // try split cell without oxygen
         {
-            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            std::shared_ptr<Prokaryotes> new_cell = std::static_pointer_cast<Prokaryotes>(cell->splitting());
+            assert(new_cell == nullptr);
+        }
+
+        cell->breath(10);
+
+        // success split
+        {
+            std::shared_ptr<Prokaryotes> new_cell = std::static_pointer_cast<Prokaryotes>(cell->splitting());
             assert(new_cell != nullptr);
         }
 
@@ -119,11 +136,30 @@ void test_animal_cells() {
         fill_nuts<Protein>(nuts, 10);
         m_cell->feed(nuts);
 
-        // try split cell with enought energy
+        // try split cell without oxygen
+        {
+            std::shared_ptr<MuscleCells> new_cell = std::static_pointer_cast<MuscleCells>(m_cell->splitting());
+            assert(new_cell == nullptr);
+        }
+
+        m_cell->breath(10);
+
+        // success split
         {
             std::shared_ptr<MuscleCells> new_cell = std::static_pointer_cast<MuscleCells>(m_cell->splitting());
             assert(new_cell != nullptr);
+            m_cell->thread.right_neighbor = nullptr;
         }
+
+        std::shared_ptr<BloodCells> b_cell = std::make_shared<BloodCells>();
+        // try breath without oxygen pool
+        b_cell->substance_transfer(m_cell);
+        assert(m_cell->oxygen() == 10);
+
+        // success breath
+        b_cell->get_oxygen(10);
+        b_cell->substance_transfer(m_cell);
+        assert(m_cell->oxygen() == 20);
     }
     catch(const std::exception& e)
     {

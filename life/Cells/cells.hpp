@@ -42,9 +42,9 @@ using Nutrients = std::vector<std::unique_ptr<DefaultEnergySource>>;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
 struct CytoplasmThread {                          // для соединения клеток одного типа
-    bool has_two_neighbors()  { return (right_neighbor && left_neighbor) ? true : false; }
-    bool has_right_neighbor() { return (right_neighbor) ? true : false; }
-    bool has_left_neighbor()  { return (left_neighbor) ? true : false; }
+    bool has_two_neighbors()  { return (right_neighbor != nullptr && left_neighbor != nullptr) ? true : false; }
+    bool has_right_neighbor() { return (right_neighbor != nullptr) ? true : false; }
+    bool has_left_neighbor()  { return (left_neighbor != nullptr) ? true : false; }
 
     std::shared_ptr<EukaryotesType> right_neighbor = nullptr;
     std::shared_ptr<EukaryotesType> left_neighbor = nullptr;
@@ -120,9 +120,21 @@ struct Cell
     */
     virtual void feed(Nutrients&) = 0;
     virtual std::shared_ptr<Cell> splitting() = 0;
-    size_t ata() { return _ata; }
+
+    void breath(size_t molecules_count) {
+        _oxygen_amount += molecules_count;
+    }
+    size_t ata() {
+        return _ata;
+    }
+    size_t oxygen() {
+        return _oxygen_amount;
+    }
     bool enough_energy() {
-        return (_ata / INCREASE_TO_SPLIT) > MIN_CELL_ENERGY;
+        return (_ata - MIN_CELL_ENERGY) > MIN_CELL_ENERGY;
+    }
+    bool enough_oxygen() {
+        return (_oxygen_amount - MIN_CELL_OXYGEN) > MIN_CELL_OXYGEN;
     }
 
 protected:
@@ -233,7 +245,7 @@ struct CancerCell
 template <typename EukaryotesType>
 std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<Cell> other) {
     if (auto cell = std::dynamic_pointer_cast<EukaryotesType>(other)) {
-        if (!other->enough_energy())
+        if (!cell->enough_energy() || !cell->enough_oxygen())
             return NotEnoughEnergy;
 
         auto new_cell = std::make_shared<EukaryotesType>(other);
@@ -245,7 +257,7 @@ std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<Cell> ot
 
 std::shared_ptr<Cell> CellFactory::splitting_prokaryotes(std::shared_ptr<Cell> other) {
     if (auto cell = std::dynamic_pointer_cast<Prokaryotes>(other)) {
-        if (!cell->enough_energy())
+        if (!cell->enough_energy() || !cell->enough_oxygen())
             return NotEnoughEnergy;
         return std::make_shared<Prokaryotes>(cell);
     }
