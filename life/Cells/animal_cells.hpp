@@ -21,14 +21,12 @@ struct AnimalCell
             : Eukaryotes
 {
     AnimalCell()
-        : Eukaryotes(MIN_CELL_ENERGY, Shape::Circle, Type::Animal)
+        : Eukaryotes(Shape::Circle, Type::Animal)
     {}
 
-    AnimalCell(std::shared_ptr<AnimalCell> other)
-        : Eukaryotes((other->_ata / 2), other->_shape, other->_type)
-    {
-        other->energy_reduction();
-    }
+    AnimalCell(std::shared_ptr<Cell> other)
+        : Eukaryotes(other)
+    {}
 
     virtual std::shared_ptr<Cell> splitting() override = 0;
     void feed(Nutrients& _nuts) override {
@@ -48,7 +46,7 @@ struct AnimalCell
                 return;
             }
             --i;
-            std::unique_ptr<Nutrient> nut = std::unique_ptr<Nutrient>(static_cast<Nutrient*>(_nuts[i].release()));
+            std::unique_ptr<DefaultEnergySource> nut = std::move(_nuts[i]);
             _nuts.erase(_nuts.begin() + i);
             size_t temp = nut->value();
             this->increace_energy(temp);
@@ -79,12 +77,12 @@ struct MuscleCells
         : AnimalCell()
     {}
 
-    MuscleCells(std::shared_ptr<MuscleCells> other)
+    MuscleCells(std::shared_ptr<Cell> other)
         : AnimalCell(other)
     {}
 
     std::shared_ptr<Cell> splitting() override {
-        return _cf->splitting_eukaryotes<MuscleCells>(std::static_pointer_cast<MuscleCells>(shared_from_this()));
+        return _cf->splitting_eukaryotes<MuscleCells>(shared_from_this());
     }
 
     void shrink() {
@@ -135,7 +133,7 @@ private:
 // struct BloodCells
 //             : AnimalCell
 // {
-//     void substance_transfer() { // apply oxygen or opiates
+//     void substance_transfer() { // для начала кислород
 
 //     }
 // };

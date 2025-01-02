@@ -9,23 +9,23 @@ constexpr const size_t FAT_VAL = 9;
 constexpr const size_t CARB_VAL = 4;
 constexpr const size_t LIGHT_VAL = 890; // in 1 hours
 
-struct DefaultNutrient {
-    DefaultNutrient(size_t val = DEFAULT_VAL)
+struct DefaultEnergySource {
+    DefaultEnergySource(size_t val = DEFAULT_VAL)
         : _nutritional_value(val)
     {}
 
     size_t value() { return _nutritional_value; }
-    virtual const std::type_info& get_type() { return typeid(DefaultNutrient); }
+    virtual const std::type_info& get_type() { return typeid(DefaultEnergySource); }
 
 private:
     const size_t _nutritional_value;
 };
 
 struct Nutrient
-            : DefaultNutrient
+            : DefaultEnergySource
 {
     Nutrient(size_t val = DEFAULT_VAL)
-        : DefaultNutrient(val)
+        : DefaultEnergySource(val)
     {}
 
     virtual const std::type_info& get_type() override { return typeid(Nutrient); }
@@ -62,10 +62,10 @@ struct Carb
 };
 
 struct LightEnergi
-            : DefaultNutrient
+            : DefaultEnergySource
 {
     LightEnergi()
-        : DefaultNutrient(LIGHT_VAL)
+        : DefaultEnergySource(LIGHT_VAL)
     {}
 
     const std::type_info& get_type() override { return typeid(LightEnergi); }
