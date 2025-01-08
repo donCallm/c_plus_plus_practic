@@ -1,36 +1,33 @@
+#include <assert.h>
 #include "tests.hpp"
 #include "../Cells/animal_cells.hpp"
 #include "../Tissue/tissue.hpp"
 #include <iostream>
-#include <assert.h>
 
 /*
     Смерть клетки от нехватки нутриентов
     или кислорода нужно проверить уже в тканях.
 */
 
-template <typename T>
-void fill_nuts(std::vector<std::unique_ptr<DefaultEnergySource>>& nuts, const size_t count) {
-    if (count == 0) return;
-    
-    for (size_t i = 0; i < count; ++i)
-        nuts.push_back(std::unique_ptr<DefaultEnergySource>(std::make_unique<T>()));
-}
+/*
+    Стараться использовать ссылки,
+    а не указатели. Ссылки не требуют проверок.
+    Ссылка непосредственно указывает на объект,
+    а указатель содержит адрес, который нужно прочитать.
+    (Попробовать сделать так)
+*/
 
 void default_functional() {
     std::cout << "DefaultFunctional\n";
 
     try
     {
-        std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
-        fill_nuts<DefaultEnergySource>(nuts, 1);
-
         // try create cell
         std::shared_ptr<CancerCell> cell = std::make_shared<CancerCell>();
         assert(cell->ata() == 6);
         
         // try feed
-        cell->feed(nuts);
+        cell->feed(std::unique_ptr<DefaultEnergySource>(std::make_unique<DefaultEnergySource>()));
         assert(cell->ata() == 7);
 
         // try split cell witout energy
@@ -39,8 +36,8 @@ void default_functional() {
             assert(new_cell == nullptr);
         }
 
-        fill_nuts<DefaultEnergySource>(nuts, 10);
-        cell->feed(nuts);
+        for (size_t i = 0; i < 10; ++i)
+            cell->feed(std::unique_ptr<DefaultEnergySource>(std::make_unique<DefaultEnergySource>()));
 
         // try split cell without oxygen
         {
@@ -57,11 +54,11 @@ void default_functional() {
             cell->thread.right_neighbor = nullptr;
         }
 
-        std::cout << "\t:complete;\n";
+        std::cout << "\t:complete\n";
     }
     catch(const std::exception& e)
     {
-        std::cout << "\t:error;\n";
+        std::cerr << "\t:error\n";
     }
 }
 
@@ -70,15 +67,12 @@ void test_prokaryotes() {
 
     try
     {
-        std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
-        fill_nuts<DefaultEnergySource>(nuts, 1);
-
         // try create cell
         std::shared_ptr<Prokaryotes> cell = std::make_shared<Prokaryotes>();
         assert(cell->ata() == 6);
         
         // try feed
-        cell->feed(nuts);
+        cell->feed(std::unique_ptr<DefaultEnergySource>(std::make_unique<DefaultEnergySource>()));
         assert(cell->ata() == 7);
 
         // try split cell witout energy
@@ -87,8 +81,8 @@ void test_prokaryotes() {
             assert(new_cell == nullptr);
         }
 
-        fill_nuts<DefaultEnergySource>(nuts, 10);
-        cell->feed(nuts);
+        for (size_t i = 0; i < 10; ++i)
+            cell->feed(std::unique_ptr<DefaultEnergySource>(std::make_unique<DefaultEnergySource>()));
 
         // try split cell without oxygen
         {
@@ -104,11 +98,11 @@ void test_prokaryotes() {
             assert(new_cell != nullptr);
         }
 
-        std::cout << "\t:complete;\n";
+        std::cout << "\t:complete\n";
     }
     catch(const std::exception& e)
     {
-        std::cout << "\t:error;\n";
+        std::cerr << "\t:error\n";
     }
 }
 
@@ -117,15 +111,12 @@ void test_animal_cells() {
     bool has_errors = false;
     try
     {
-        std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
-        fill_nuts<Protein>(nuts, 1);
-
         // try create cell
         std::shared_ptr<MuscleCells> m_cell = std::make_shared<MuscleCells>();
         assert(m_cell->ata() == 6);
 
         // try feed
-        m_cell->feed(nuts);
+        m_cell->feed(std::unique_ptr<Protein>(std::make_unique<Protein>()));
         assert(m_cell->ata() == 10);
 
         // try split cell witout energy
@@ -134,8 +125,8 @@ void test_animal_cells() {
             assert(new_cell == nullptr);
         }
 
-        fill_nuts<Protein>(nuts, 10);
-        m_cell->feed(nuts);
+        for (size_t i = 0; i < 10; ++i)
+            m_cell->feed(std::unique_ptr<Protein>(std::make_unique<Protein>()));
 
         // try split cell without oxygen
         {
@@ -164,26 +155,37 @@ void test_animal_cells() {
     }
     catch(const std::exception& e)
     {
-        std::cout << "\t:MusclesCells - error;\n";
+        std::cerr << "\t:AnimalCells::error(" << e.what() << ")\n";
         has_errors = true;
     }
     
     
     if (!has_errors) {
-        std::cout << "\t:complete;\n";
+        std::cout << "\t:complete\n";
     }
 }
 
 void test_tissue() {
-    std::cout << "TestAnimalCells\n";
+    std::cout << "TestTissueCells\n";
     try
     {
-        std::shared_ptr<Muscles> tissue = std::make_shared<Muscles>();
-        std::cout << "\t:complete;\n";
+        std::shared_ptr<Muscles> m_tissue = std::make_shared<Muscles>();
+        assert(m_tissue->cells_count() == 10);
+
+        std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
+        for (size_t i = 0; i < 10; ++i) {
+            nuts.push_back(std::unique_ptr<Protein>(std::make_unique<Protein>()));
+        }
+        m_tissue->feed(nuts);
+
+        m_tissue->shrink();
+        m_tissue->relax();
+
+        std::cout << "\t:complete\n";
     }
     catch(const std::exception& e)
     {
-        std::cout << "\t:MusclesCells - error;\n";
+        std::cerr << "\t:Tissue::error(" << e.what() << ")\n";
     }
     
 }

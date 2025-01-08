@@ -4,6 +4,8 @@
 #include <typeinfo>
 #include "cells.hpp"
 #include <iostream>
+#include <mutex>
+#include <atomic>
 
 using warmth = size_t;
 using sweat = size_t;
@@ -17,41 +19,41 @@ const std::type_info& PROTEIN_ID = typeid(Protein);
 const std::type_info& FAT_ID = typeid(Fat);
 const std::type_info& CARB_ID = typeid(Carb);
 
+std::atomic_int last_id = 0;
+
 struct AnimalCell
             : Eukaryotes
 {
     AnimalCell()
         : Eukaryotes(Shape::Circle, Type::Animal)
-    {}
+    {id = last_id++;}
 
     AnimalCell(std::shared_ptr<Cell> other)
         : Eukaryotes(other)
-    {}
+    {id = last_id++;}
 
     virtual std::shared_ptr<Cell> splitting() override = 0;
-    void feed(Nutrients& _nuts) override {
-        if (_nuts.size() < 0)
-            return;
 
-        const std::type_info& nut_id = _nuts[0]->get_type();
+    void feed(std::unique_ptr<DefaultEnergySource> nut) override {
+        std::lock_guard<std::mutex> lock(_m);
+        if (nut == nullptr) {
+            return;
+        }
+
+        const std::type_info& nut_id = nut->get_type();
         if (nut_id != PROTEIN_ID && nut_id != FAT_ID && nut_id != CARB_ID) {
-            std::cout << "HERE" << std::endl;
             return;
         }
         
-        size_t i = _nuts.size();
-        while (i > 0) {
-            if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
-                this->thread.right_neighbor->feed(_nuts);
-                return;
-            }
-            --i;
-            std::unique_ptr<DefaultEnergySource> nut = std::move(_nuts[i]);
-            _nuts.erase(_nuts.begin() + i);
-            size_t temp = nut->value();
-            this->increace_energy(temp);
+        if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
+            this->thread.right_neighbor->feed(std::move(nut));
+            return;
         }
+        this->increace_energy(nut->value());
     }
+size_t id;
+private:
+    std::mutex _m;
 };
 
 // struct EpithalialCells
@@ -82,10 +84,12 @@ struct MuscleCells
     {}
 
     std::shared_ptr<Cell> splitting() override {
+        std::lock_guard<std::mutex> lock(_m);
         return _cf->splitting_eukaryotes<MuscleCells>(shared_from_this());
     }
 
     void shrink() {
+        std::lock_guard<std::mutex> lock(_m);
         _is_shrink = true;
         while (_is_shrink && _oxygen_amount > MIN_CELL_OXYGEN && _ata > MIN_CELL_ENERGY) {
             spend_energy_for_work();
@@ -104,6 +108,7 @@ private:
     }
 
 private:
+    std::mutex _m;
     bool _is_shrink;
 };
 

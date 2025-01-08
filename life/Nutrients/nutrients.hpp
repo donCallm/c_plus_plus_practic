@@ -7,7 +7,7 @@ constexpr const size_t DEFAULT_VAL = 1;
 constexpr const size_t PROTEIN_VAL = 4;
 constexpr const size_t FAT_VAL = 9;
 constexpr const size_t CARB_VAL = 4;
-constexpr const size_t LIGHT_VAL = 890; // in 1 hours
+constexpr const size_t LIGHT_VAL = 8;
 
 struct DefaultEnergySource {
     DefaultEnergySource(size_t val = DEFAULT_VAL)

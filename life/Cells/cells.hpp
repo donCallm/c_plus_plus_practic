@@ -37,8 +37,6 @@ struct Eukaryotes;
 struct Prokaryotes;
 struct CancerCell;
 
-using Nutrients = std::vector<std::unique_ptr<DefaultEnergySource>>;
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
 struct CytoplasmThread {                          // для соединения клеток одного типа
@@ -118,7 +116,7 @@ struct Cell
         число раз, наберут нужное количество
         энергии и умрут.
     */
-    virtual void feed(Nutrients&) = 0;
+    virtual void feed(std::unique_ptr<DefaultEnergySource>) = 0;
     virtual std::shared_ptr<Cell> splitting() = 0;
 
     void breath(size_t molecules_count) {
@@ -167,9 +165,8 @@ struct Prokaryotes
         return _cf->splitting_prokaryotes(shared_from_this());
     }
 
-    void feed(Nutrients& nuts) override {
-        for (auto& nut : nuts)
-            increace_energy(nut->value());
+    void feed(std::unique_ptr<DefaultEnergySource> nut) override {
+        increace_energy(nut->value());
     }
 };
 
@@ -201,7 +198,7 @@ struct Eukaryotes
         }
     }
 
-    virtual void feed(Nutrients&) override = 0;
+    virtual void feed(std::unique_ptr<DefaultEnergySource>) override = 0;
     virtual std::shared_ptr<Cell> splitting() override = 0;
 
 public:
@@ -226,19 +223,16 @@ struct CancerCell
         return _cf->splitting_eukaryotes<CancerCell>(shared_from_this());
     }
 
-    void feed(Nutrients& _nuts) override {
-        size_t i = _nuts.size();
-        while (i > 0) {
-            if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
-                this->thread.right_neighbor->feed(_nuts);
-                return;
-            }
-            --i;
-            std::unique_ptr<DefaultEnergySource> nut = std::move(_nuts[i]);
-            _nuts.erase(_nuts.begin() + i);
-            size_t temp = nut->value();
-            this->increace_energy(temp);
+    void feed(std::unique_ptr<DefaultEnergySource> nut) override {
+        if (nut == nullptr) {
+            return;
         }
+        if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
+            this->thread.right_neighbor->feed(std::move(nut));
+            return;
+        }
+        size_t temp = nut->value();
+        this->increace_energy(nut->value());
     }
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
