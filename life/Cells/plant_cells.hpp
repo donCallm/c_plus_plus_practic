@@ -1,45 +1,62 @@
 #pragma once
 
+#include <mutex>
 #include "cells.hpp"
 
 struct PlantCell
             : Eukaryotes
 {
-    PlantCell splitting() override {
+    PlantCell()
+        : Eukaryotes(Shape::Circle, Type::Plant)
+    {}
 
-    }
-    void feed(Nutrients<LightEnergi>& _nuts) override {
-            size_t i = _nuts.size();
-            while (i > 0) {
-                if (this->_tread.right_neighbor->_ata < this->_ata) {
-                    this->_tread.right_neighbor->feed(_nuts);
-                    return;
-                }
-                --i;
-                std::unique_ptr<DefaultNutrient> nut = _nuts.pop_back();
-                increace_energy(nut->value());
-            }   
+    PlantCell(std::shared_ptr<Cell> other)
+        : Eukaryotes(other)
+    {}
+
+    virtual std::shared_ptr<Cell> splitting() override = 0;
+
+    void feed(std::unique_ptr<DefaultEnergySource> nut) override {
+        std::lock_guard<std::mutex> lock(_m);
+        if (nut == nullptr) {
+            return;
+        }    
+
+        if (this->thread.has_right_neighbor() && this->thread.right_neighbor->ata() < this->ata()) {
+            this->thread.right_neighbor->feed(std::move(nut));
+            return;
         }
 
+        increace_energy(nut->value());
+    }
+
 private:
-    std::string _vacuole;
-    std::string _chloroplast;
+    std::mutex _m;
 };
 
-// struct ParenchymaCells
-//             : PlantCell
-// {
-//     void stock_up() {
-        
-//     }
+struct ParenchymaCells
+            : PlantCell
+{
+    ParenchymaCells()
+        : PlantCell()
+    {}
 
-//     void photosynthesis() {
+    ParenchymaCells(std::shared_ptr<Cell> other)
+        : PlantCell(other)
+    {}
 
-//     }
+    void photosynthesis(std::unique_ptr<LightEnergy> eng) {
+        this->feed(std::move(eng));
+    }
 
-// private:
-//     size_t _call_count
-// };
+    std::shared_ptr<Cell> splitting() override {
+        std::lock_guard<std::mutex> lock(_m);
+        return _cf->splitting_eukaryotes<ParenchymaCells>(shared_from_this());
+    }
+
+private:
+    std::mutex _m;
+};
 
 // struct CollenchymaCells // for new part
 //             : PlantCell

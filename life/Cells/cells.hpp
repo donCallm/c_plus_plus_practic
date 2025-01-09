@@ -16,7 +16,6 @@
     угодно раз.
 */
 
-
 /*
     Что бы сделать какое-то действие
     клетке нужен кислород.
@@ -25,6 +24,7 @@
     Прокариоты будут дышать сами.
 */
 
+#define AlreadSplit nullptr
 #define NotEnoughEnergy nullptr
 #define WrongType nullptr
 
@@ -239,6 +239,9 @@ struct CancerCell
 template <typename EukaryotesType>
 std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<Cell> other) {
     if (auto cell = std::dynamic_pointer_cast<EukaryotesType>(other)) {
+        if (cell->thread.has_right_neighbor())
+            return AlreadSplit;
+        
         if (!cell->enough_energy() || !cell->enough_oxygen())
             return NotEnoughEnergy;
 

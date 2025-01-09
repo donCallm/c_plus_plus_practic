@@ -1,6 +1,7 @@
 #include <assert.h>
 #include "tests.hpp"
 #include "../Cells/animal_cells.hpp"
+#include "../Cells/plant_cells.hpp"
 #include "../Tissue/tissue.hpp"
 #include <iostream>
 
@@ -149,7 +150,7 @@ void test_animal_cells() {
         assert(m_cell->oxygen() == 10);
 
         // success breath
-        b_cell->get_oxygen(10);
+        b_cell->oxygen_pool += 10;
         b_cell->substance_transfer(m_cell);
         assert(m_cell->oxygen() == 20);
     }
@@ -165,12 +166,19 @@ void test_animal_cells() {
     }
 }
 
-void test_tissue() {
+/*
+    Кровь долджна принимать прнимать вещества
+    и потом отдавать в специализированные клетки
+    (в каждой ткани должен быть массив крови).
+*/
+
+void test_animal_tissue() {
     std::cout << "TestTissueCells\n";
     try
     {
         std::shared_ptr<Muscles> m_tissue = std::make_shared<Muscles>();
         assert(m_tissue->cells_count() == 10);
+        assert(m_tissue->blood_cells_count() == 10);
 
         std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
         for (size_t i = 0; i < 10; ++i) {
@@ -181,6 +189,18 @@ void test_tissue() {
         m_tissue->shrink();
         m_tissue->relax();
 
+        std::vector<Oxygen> o_pool = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
+        m_tissue->get_oxygen(o_pool);
+        m_tissue->breath();
+
+        for (size_t i = 0; i < 10; ++i)
+            nuts.push_back(std::unique_ptr<Protein>(std::make_unique<Protein>()));
+        assert(nuts.size() == 10);
+
+        m_tissue->get_nuts(nuts);
+        assert(nuts.size() == 0);
+        
+
         std::cout << "\t:complete\n";
     }
     catch(const std::exception& e)
@@ -190,10 +210,19 @@ void test_tissue() {
     
 }
 
+void test_plant_tissue() {
+
+}
+
 void test_cells() {
     default_functional();
     test_prokaryotes();
     test_animal_cells();
+}
+
+void test_tissue() {
+    test_animal_tissue();
+    test_plant_tissue();
 }
 
 void test() {

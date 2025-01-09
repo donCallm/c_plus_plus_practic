@@ -5,7 +5,6 @@
 #include "cells.hpp"
 #include <iostream>
 #include <mutex>
-#include <atomic>
 
 using warmth = size_t;
 using sweat = size_t;
@@ -19,18 +18,16 @@ const std::type_info& PROTEIN_ID = typeid(Protein);
 const std::type_info& FAT_ID = typeid(Fat);
 const std::type_info& CARB_ID = typeid(Carb);
 
-std::atomic_int last_id = 0;
-
 struct AnimalCell
             : Eukaryotes
 {
     AnimalCell()
         : Eukaryotes(Shape::Circle, Type::Animal)
-    {id = last_id++;}
+    {}
 
     AnimalCell(std::shared_ptr<Cell> other)
         : Eukaryotes(other)
-    {id = last_id++;}
+    {}
 
     virtual std::shared_ptr<Cell> splitting() override = 0;
 
@@ -45,13 +42,13 @@ struct AnimalCell
             return;
         }
         
-        if (this->thread.right_neighbor && this->thread.right_neighbor->ata() < this->ata()) {
+        if (this->thread.has_right_neighbor() && this->thread.right_neighbor->ata() < this->ata()) {
             this->thread.right_neighbor->feed(std::move(nut));
             return;
         }
         this->increace_energy(nut->value());
     }
-size_t id;
+
 private:
     std::mutex _m;
 };
@@ -145,20 +142,6 @@ private:
 //     std::vector<int> _info;
 // };
 
-
-/*
-    Клетка крови будет брать в себя кислород
-    и передавать его другой клетке. Из-за
-    этого у нее должно быть больше кислорода.
-    Я представляю поток крови как массив клеток,
-    каждая клетка берет себе кислород,
-    пока у соседа справа его меньше, потом
-    он его передаст соседу и тд.
-    Клетка крови будет идти по массиву других клеток
-    и отдавать кислород, пока у принимающей клетки
-    кислорода меньше, потом соседу (везде +- такая логика)
-*/
-
 struct BloodCells
             : AnimalCell
 {
@@ -167,36 +150,38 @@ struct BloodCells
     {}
 
     BloodCells(std::shared_ptr<Cell> other)
-        : AnimalCell(other)
+        : AnimalCell(other),
+        oxygen_pool(0),
+        nut_pool(nullptr)
     {}
 
     std::shared_ptr<Cell> splitting() override {
-        return _cf->splitting_eukaryotes<MuscleCells>(shared_from_this());
+        return _cf->splitting_eukaryotes<BloodCells>(shared_from_this());
     }
 
     void substance_transfer(std::shared_ptr<AnimalCell> c) { // для начала кислород
-        if (oxygen_pool == 0) {
-            return;
-        }
-        if (!c->thread.has_right_neighbor()) {
-            c->breath(oxygen_pool);
-            oxygen_pool = 0;
-            return;
-        } else if (c->oxygen() < c->thread.right_neighbor->oxygen()) {
-            size_t to_transfer = (c->oxygen() - c->thread.right_neighbor->oxygen()) * 2;
-            (to_transfer > oxygen_pool) ? c->breath(oxygen_pool) : c->breath(to_transfer);
-            if (to_transfer < oxygen_pool)
-                oxygen_pool -= to_transfer;
-            else
-                oxygen_pool = 0;
-            
-            return;
-        }
+        transfer_oxygen(c);
     }
 
-    void get_oxygen(size_t oxygen_count) { oxygen_pool += oxygen_count; }
+    void transfer_nutrients(std::shared_ptr<AnimalCell> c) {
+        if (c == nullptr || nut_pool == nullptr) {
+            return;
+        }
+        c->feed(std::move(nut_pool));
+        nut_pool = nullptr;
+    }
 
-    size_t oxygen_pool;
+    void transfer_oxygen(std::shared_ptr<AnimalCell> c) {
+        if (c == nullptr || oxygen_pool == 0) {
+            return;
+        }
+
+        c->breath(oxygen_pool);
+        oxygen_pool = 0;
+    }
+
+    Oxygen                               oxygen_pool;
+    std::unique_ptr<DefaultEnergySource> nut_pool;
 };
 
 // struct ConnectiveCells

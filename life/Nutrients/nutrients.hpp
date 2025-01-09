@@ -9,6 +9,8 @@ constexpr const size_t FAT_VAL = 9;
 constexpr const size_t CARB_VAL = 4;
 constexpr const size_t LIGHT_VAL = 8;
 
+using Oxygen = size_t;
+
 struct DefaultEnergySource {
     DefaultEnergySource(size_t val = DEFAULT_VAL)
         : _nutritional_value(val)
@@ -61,12 +63,12 @@ struct Carb
     const std::type_info& get_type() override { return typeid(Carb); }
 };
 
-struct LightEnergi
+struct LightEnergy
             : DefaultEnergySource
 {
-    LightEnergi()
+    LightEnergy()
         : DefaultEnergySource(LIGHT_VAL)
     {}
 
-    const std::type_info& get_type() override { return typeid(LightEnergi); }
+    const std::type_info& get_type() override { return typeid(LightEnergy); }
 };
