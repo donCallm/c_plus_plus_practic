@@ -19,7 +19,7 @@ const std::type_info& FAT_ID = typeid(Fat);
 const std::type_info& CARB_ID = typeid(Carb);
 
 struct AnimalCell
-            : Eukaryotes
+            : virtual Eukaryotes
 {
     AnimalCell()
         : Eukaryotes(Shape::Circle, Type::Animal)
@@ -69,20 +69,21 @@ private:
 //     }
 // };
 
-struct MuscleCells
+struct MuscleCell
             : AnimalCell
 {
-    MuscleCells()
+    MuscleCell()
         : AnimalCell()
     {}
 
-    MuscleCells(std::shared_ptr<Cell> other)
-        : AnimalCell(other)
+    MuscleCell(std::shared_ptr<Cell> other)
+        : Cell(other),
+        AnimalCell(other)
     {}
 
     std::shared_ptr<Cell> splitting() override {
         std::lock_guard<std::mutex> lock(_m);
-        return _cf->splitting_eukaryotes<MuscleCells>(shared_from_this());
+        return _cf->splitting_eukaryotes<MuscleCell>(shared_from_this());
     }
 
     void shrink() {
@@ -106,7 +107,7 @@ private:
 
 private:
     std::mutex _m;
-    bool _is_shrink;
+    bool       _is_shrink;
 };
 
 // struct Neurons
@@ -141,48 +142,6 @@ private:
 //     sinaps   _sinaps;
 //     std::vector<int> _info;
 // };
-
-struct BloodCells
-            : AnimalCell
-{
-    BloodCells()
-        : AnimalCell()
-    {}
-
-    BloodCells(std::shared_ptr<Cell> other)
-        : AnimalCell(other),
-        oxygen_pool(0),
-        nut_pool(nullptr)
-    {}
-
-    std::shared_ptr<Cell> splitting() override {
-        return _cf->splitting_eukaryotes<BloodCells>(shared_from_this());
-    }
-
-    void substance_transfer(std::shared_ptr<AnimalCell> c) { // для начала кислород
-        transfer_oxygen(c);
-    }
-
-    void transfer_nutrients(std::shared_ptr<AnimalCell> c) {
-        if (c == nullptr || nut_pool == nullptr) {
-            return;
-        }
-        c->feed(std::move(nut_pool));
-        nut_pool = nullptr;
-    }
-
-    void transfer_oxygen(std::shared_ptr<AnimalCell> c) {
-        if (c == nullptr || oxygen_pool == 0) {
-            return;
-        }
-
-        c->breath(oxygen_pool);
-        oxygen_pool = 0;
-    }
-
-    Oxygen                               oxygen_pool;
-    std::unique_ptr<DefaultEnergySource> nut_pool;
-};
 
 // struct ConnectiveCells
 //             : AnimalCell

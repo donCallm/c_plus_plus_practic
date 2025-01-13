@@ -5,6 +5,7 @@
 #include <future>
 #include <unistd.h>
 #include "../Cells/animal_cells.hpp"
+#include "../Cells/transport_cells.hpp"
 // #include "../Cells/plant_cells.hpp"
 
 constexpr size_t DEFAULT_MAX_CELLS_COUNT = 10;
@@ -15,27 +16,36 @@ template <typename CellType>
 using Cells = std::vector<std::shared_ptr<CellType>>;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct TissueFactory {
-    Cells<BloodCells> build_blood(size_t count) {
-        Cells<BloodCells> cells;
-        auto first_cell = std::shared_ptr<BloodCells>(std::make_shared<BloodCells>());
-        if (first_cell == nullptr) {
-            throw std::runtime_error("First blood cell is null");
-        }
+    template <typename CellType>
+    Cells<TransportCell> build_ts_fluid(size_t count) {
+        Cells<CellType> cells;
+        auto first_cell = std::shared_ptr<CellType>(std::make_shared<CellType>());
         cells.push_back(first_cell);
-
+        
         for (size_t i = 0; i < count - 1; ++i) {
-            cells[i]->feed(std::unique_ptr<Fat>(std::make_unique<Fat>()));
+            if constexpr (std::is_same<CellType, BloodCell>::value) {
+                cells[i]->feed(std::make_unique<Fat>());
+            } else if constexpr (std::is_same<CellType, PhloemJuice>::value) {
+                cells[i]->feed(std::make_unique<LightEnergy>());
+            }
             cells[i]->breath(10);
 
-            auto new_cell = std::static_pointer_cast<BloodCells>(cells[i]->splitting());
+            auto new_cell = std::dynamic_pointer_cast<CellType>(cells[i]->splitting());
             if (new_cell == nullptr) {
-                throw std::runtime_error("Some blood cell is null");
+                throw std::runtime_error("NULL");
             }
-
             cells.push_back(new_cell);
         }
 
-        return cells;
+        Cells<TransportCell> res;
+        for (size_t i = 0; i < count; ++i) {
+            if (auto new_cell = std::dynamic_pointer_cast<TransportCell>(cells[i])) {
+                res.push_back(new_cell);    
+            } else {
+                throw std::runtime_error("NULL");
+            }
+        }
+        return res;
     }
 
     template <typename CellType>
@@ -67,11 +77,55 @@ struct Tissue {
 
     size_t cells_count() { return _cells.size(); }
 
-    virtual void feed(Nutrients& nuts) = 0;
+    size_t ts_cells_count() { return _ts_fluid.size(); }
+
+    void get_oxygen(std::vector<Oxygen>& pool) {
+        if (pool.size() == 0) {
+            return;
+        }
+
+        for (size_t i = 0; i < _ts_fluid.size(); i++)
+        {
+            size_t j = 0;
+            while(true) {
+                if (_ts_fluid[j]->oxygen_pool < _ts_fluid[j + 1]->oxygen_pool) {
+                    _ts_fluid[j]->oxygen_pool += pool[i];
+                    break;
+                } else {
+                    if (++j <_ts_fluid.size() -1)
+                        break;
+                }
+            }
+        }
+    }
+
+    void breath() {
+        std::vector<std::future<void>> pool;
+        for (size_t i = 0; i < _cells.size(); ++i) {
+            pool.push_back(std::async(std::launch::async, &TransportCell::transfer_oxygen, &(*_ts_fluid[0]), _cells[i]));
+        }
+        for(auto& f : pool) {
+            f.get();
+        }
+    }
+
+    void feed() {
+        std::vector<std::future<void>> pool;
+
+        for (size_t i = 0; i < _cells.size(); ++i) {
+            pool.push_back(std::async(std::launch::async, &TransportCell::transfer_nutrients, &(*_ts_fluid[0]), _cells[i]));
+        }
+        for(auto& f : pool) {
+            f.get();
+        }
+    }
+
+    virtual void get_nuts(Nutrients& nuts) = 0;
 
 protected:
     Cells<CellType>                  _cells;
     std::unique_ptr<TissueFactory>   _tf;
+    Cells<TransportCell>             _ts_fluid;
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct AnimalTissue
@@ -80,86 +134,37 @@ struct AnimalTissue
     AnimalTissue()
         : Tissue<AnimalCell>()
     {
-        _blood = this->_tf->build_blood(DEFAULT_MAX_CELLS_COUNT);
+        this->_ts_fluid = this->_tf->build_ts_fluid<BloodCell>(DEFAULT_MAX_CELLS_COUNT);
     }
 
-    void get_oxygen(std::vector<Oxygen>& pool) {
-        if (pool.size() == 0) {
-            return;
-        }
-        
-        for (size_t i = 0; i < _blood.size(); i++)
-        {
-            size_t j = 0;
-            while(true) {
-                if (_blood[j]->oxygen_pool < _blood[j + 1]->oxygen_pool) {
-                    _blood[j]->oxygen_pool += pool[i];
-                    break;
-                } else {
-                    if (++j <_blood.size() -1)
-                        break;
-                }
-            }
-        }        
-    }
-
-    void get_nuts(Nutrients& nuts) {
+    void get_nuts(Nutrients& nuts) override {
         if (nuts.size() == 0) {
             return;
         }
 
+        size_t i = 0;
         while (nuts.size() != 0) {
-            size_t i = 0;
-            while (true) {
-                if (_blood[i]->nut_pool == nullptr) {
-                    std::unique_ptr<DefaultEnergySource> nut = std::move(*(nuts.end() - 1));
-                    nuts.erase(nuts.end() - 1);
+            std::unique_ptr<DefaultEnergySource> nut = std::move(*(nuts.end() - 1));
+            nuts.erase(nuts.end() - 1);
 
-                    const std::type_info& type = nut->get_type();
-                    if (type != PROTEIN_ID && type != FAT_ID && type != CARB_ID) {
-                        break;
-                    }
-                    
-                    _blood[i]->nut_pool = std::move(nut);
-                    break;
-                }
-                if (++i == _blood.size()) {
+            const std::type_info& type = nut->get_type();
+            if (type != PROTEIN_ID && type != FAT_ID && type != CARB_ID) {
+                throw std::runtime_error("Is not animal nutrient");
+            }
+
+            for (; i < _ts_fluid.size(); ++i)
+            {
+                if (_ts_fluid[i]->nut_pool == nullptr) {    
+                    _ts_fluid[i]->nut_pool = std::move(nut);
                     break;
                 }
             }
+
+            if (i == _ts_fluid.size()) {
+                break;
+            }
         }
     }
-
-    void breath() {
-        std::vector<std::future<void>> pool;
-
-        for (size_t i = 0; i < _cells.size(); ++i) {
-            pool.push_back(std::async(std::launch::async, &BloodCells::transfer_oxygen, &(*_blood[0]), _cells[i]));
-        }
-        for(auto& f : pool) {
-            f.get();
-        }
-    }
-
-    // TODO: нужно переделать два этот метод, что бы он не принимал нутриенты,
-    // а что бы все получалось из крови
-    void feed(Nutrients& nuts) override {
-        std::vector<std::future<void>> pool;
-        size_t it = 1;
-        for (size_t i = nuts.size(); i != 0; --i) {
-            std::unique_ptr<DefaultEnergySource> nut = std::move(*(nuts.end() - 1));
-            nuts.erase(nuts.end() - 1);
-            pool.push_back(std::async(std::launch::async, &AnimalCell::feed, &(*_cells[0]), std::move(nut)));
-        }
-        for(auto& f : pool) {
-            f.get();
-        }
-    }
-
-    size_t blood_cells_count() { return _blood.size(); }
-
-protected:
-    Cells<BloodCells> _blood;
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct Muscles
@@ -168,15 +173,15 @@ struct Muscles
     Muscles()
         : AnimalTissue()
     {
-        this->_cells = this->_tf->build_animal<MuscleCells>(DEFAULT_MAX_CELLS_COUNT);
+        this->_cells = this->_tf->build_animal<MuscleCell>(DEFAULT_MAX_CELLS_COUNT);
     }
 
     void shrink() {
         std::vector<std::future<void>> pool;
         for (size_t i = 0; i < _cells.size(); ++i)
         {
-            std::shared_ptr<MuscleCells> m_c = std::static_pointer_cast<MuscleCells>(_cells[i]);
-            pool.push_back(std::async(std::launch::async, &MuscleCells::shrink, &(*m_c)));
+            std::shared_ptr<MuscleCell> m_c = std::static_pointer_cast<MuscleCell>(_cells[i]);
+            pool.push_back(std::async(std::launch::async, &MuscleCell::shrink, &(*m_c)));
         }
         for(auto& f : pool) {
             f.get();
@@ -187,8 +192,8 @@ struct Muscles
         std::vector<std::future<void>> pool;
         for (size_t i = 0; i < _cells.size(); ++i)
         {
-            std::shared_ptr<MuscleCells> m_c = std::static_pointer_cast<MuscleCells>(_cells[i]);
-            pool.push_back(std::async(std::launch::async, &MuscleCells::relax, &(*m_c)));
+            std::shared_ptr<MuscleCell> m_c = std::static_pointer_cast<MuscleCell>(_cells[i]);
+            pool.push_back(std::async(std::launch::async, &MuscleCell::relax, &(*m_c)));
         }
         for(auto& f : pool) {
             f.get();
@@ -199,14 +204,14 @@ struct Muscles
 template <typename CellType>
 Cells<AnimalCell> TissueFactory::build_animal(size_t count) {
     Cells<AnimalCell> cells;
-    auto first_cell = std::static_pointer_cast<AnimalCell>(std::make_shared<CellType>());
+    auto first_cell = std::dynamic_pointer_cast<AnimalCell>(std::make_shared<CellType>());
     cells.push_back(first_cell);
 
     for (size_t i = 0; i < count - 1; ++i) {
         cells[i]->feed(std::unique_ptr<Fat>(std::make_unique<Fat>()));
         cells[i]->breath(10);
 
-        auto new_cell = std::static_pointer_cast<AnimalCell>(cells[i]->splitting());
+        auto new_cell = std::dynamic_pointer_cast<AnimalCell>(cells[i]->splitting());
         if (new_cell == nullptr)
             throw std::runtime_error("Some animal cell is null");
 

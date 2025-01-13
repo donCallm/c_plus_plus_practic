@@ -20,7 +20,7 @@ struct PlantCell
         std::lock_guard<std::mutex> lock(_m);
         if (nut == nullptr) {
             return;
-        }    
+        }
 
         if (this->thread.has_right_neighbor() && this->thread.right_neighbor->ata() < this->ata()) {
             this->thread.right_neighbor->feed(std::move(nut));

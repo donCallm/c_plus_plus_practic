@@ -36,6 +36,8 @@ struct Cell;
 struct Eukaryotes;
 struct Prokaryotes;
 struct CancerCell;
+struct AnimalCell;
+struct PlantCell;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename EukaryotesType = Eukaryotes>
@@ -56,11 +58,7 @@ struct CellFactory {
     std::shared_ptr<Cell> splitting_prokaryotes(std::shared_ptr<Cell> other);
 
 private:
-    template <typename EukaryotesType = Eukaryotes>
-    void add_thread(std::shared_ptr<EukaryotesType> old_cell, std::shared_ptr<EukaryotesType> new_cell) {
-        old_cell->thread.right_neighbor = new_cell;
-        new_cell->thread.left_neighbor = old_cell;
-    }
+    void add_thread(std::shared_ptr<Eukaryotes> old_cell, std::shared_ptr<Eukaryotes> new_cell);
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 struct Cell
@@ -171,7 +169,7 @@ struct Prokaryotes
 };
 
 struct Eukaryotes
-            : Cell
+            : virtual Cell
 {
     Eukaryotes()
         : Cell(Cell::Shape::Circle, Cell::Type::Plant)
@@ -212,7 +210,7 @@ struct CancerCell
         : Eukaryotes
 {
     CancerCell()
-        : Eukaryotes(Shape::Circle, Type::CancerCell)
+        : Eukaryotes()
     {}
 
     CancerCell(std::shared_ptr<Cell> other)
@@ -236,18 +234,37 @@ struct CancerCell
     }
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void CellFactory::add_thread(std::shared_ptr<Eukaryotes> old_cell, std::shared_ptr<Eukaryotes> new_cell) {
+        old_cell->thread.right_neighbor = new_cell;
+        new_cell->thread.left_neighbor = old_cell;
+    }
+
 template <typename EukaryotesType>
 std::shared_ptr<Cell> CellFactory::splitting_eukaryotes(std::shared_ptr<Cell> other) {
-    if (auto cell = std::dynamic_pointer_cast<EukaryotesType>(other)) {
-        if (cell->thread.has_right_neighbor())
+    if (auto cell = std::dynamic_pointer_cast<Eukaryotes>(other)) {
+        if (cell->thread.has_right_neighbor()) {
             return AlreadSplit;
+        }
         
-        if (!cell->enough_energy() || !cell->enough_oxygen())
+        if (!cell->enough_energy() || !cell->enough_oxygen()) {
             return NotEnoughEnergy;
+        }
 
-        auto new_cell = std::make_shared<EukaryotesType>(other);
-        add_thread(cell, new_cell);
-        return new_cell;
+        if (auto new_cell = std::dynamic_pointer_cast<AnimalCell>(std::make_shared<EukaryotesType>(cell))) {
+            add_thread(cell, new_cell);
+            return new_cell;
+        }
+        else if (auto new_cell = std::dynamic_pointer_cast<PlantCell>(std::make_shared<EukaryotesType>(cell))) {
+            add_thread(cell, new_cell);
+            return new_cell;
+        }
+        else if (auto new_cell = std::dynamic_pointer_cast<CancerCell>(std::make_shared<EukaryotesType>(cell))) {
+            add_thread(cell, new_cell);
+            return new_cell;
+        }
+        else {
+            return WrongType;
+        }
     }
     return WrongType;
 }

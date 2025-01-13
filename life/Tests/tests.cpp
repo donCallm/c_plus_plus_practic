@@ -33,7 +33,7 @@ void default_functional() {
 
         // try split cell witout energy
         {
-            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            std::shared_ptr<CancerCell> new_cell = std::dynamic_pointer_cast<CancerCell>(cell->splitting());
             assert(new_cell == nullptr);
         }
 
@@ -42,7 +42,7 @@ void default_functional() {
 
         // try split cell without oxygen
         {
-            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            std::shared_ptr<CancerCell> new_cell = std::dynamic_pointer_cast<CancerCell>(cell->splitting());
             assert(new_cell == nullptr);
         }
 
@@ -50,7 +50,7 @@ void default_functional() {
 
         // success split
         {
-            std::shared_ptr<CancerCell> new_cell = std::static_pointer_cast<CancerCell>(cell->splitting());
+            std::shared_ptr<CancerCell> new_cell = std::dynamic_pointer_cast<CancerCell>(cell->splitting());
             assert(new_cell != nullptr);
             cell->thread.right_neighbor = nullptr;
         }
@@ -113,7 +113,7 @@ void test_animal_cells() {
     try
     {
         // try create cell
-        std::shared_ptr<MuscleCells> m_cell = std::make_shared<MuscleCells>();
+        std::shared_ptr<MuscleCell> m_cell = std::make_shared<MuscleCell>();
         assert(m_cell->ata() == 6);
 
         // try feed
@@ -122,7 +122,7 @@ void test_animal_cells() {
 
         // try split cell witout energy
         {
-            std::shared_ptr<MuscleCells> new_cell = std::static_pointer_cast<MuscleCells>(m_cell->splitting());
+            std::shared_ptr<MuscleCell> new_cell = std::dynamic_pointer_cast<MuscleCell>(m_cell->splitting());
             assert(new_cell == nullptr);
         }
 
@@ -131,27 +131,25 @@ void test_animal_cells() {
 
         // try split cell without oxygen
         {
-            std::shared_ptr<MuscleCells> new_cell = std::static_pointer_cast<MuscleCells>(m_cell->splitting());
+            std::shared_ptr<MuscleCell> new_cell = std::dynamic_pointer_cast<MuscleCell>(m_cell->splitting());
             assert(new_cell == nullptr);
         }
 
-        m_cell->breath(10);
-
         // success split
+        m_cell->breath(10);
         {
-            std::shared_ptr<MuscleCells> new_cell = std::static_pointer_cast<MuscleCells>(m_cell->splitting());
+            std::shared_ptr<MuscleCell> new_cell = std::dynamic_pointer_cast<MuscleCell>(m_cell->splitting());
             assert(new_cell != nullptr);
             m_cell->thread.right_neighbor = nullptr;
         }
-
-        std::shared_ptr<BloodCells> b_cell = std::make_shared<BloodCells>();
+        std::shared_ptr<BloodCell> b_cell = std::make_shared<BloodCell>();
         // try breath without oxygen pool
-        b_cell->substance_transfer(m_cell);
+        b_cell->transfer_oxygen(m_cell);
         assert(m_cell->oxygen() == 10);
 
         // success breath
         b_cell->oxygen_pool += 10;
-        b_cell->substance_transfer(m_cell);
+        b_cell->transfer_oxygen(m_cell);
         assert(m_cell->oxygen() == 20);
     }
     catch(const std::exception& e)
@@ -178,28 +176,25 @@ void test_animal_tissue() {
     {
         std::shared_ptr<Muscles> m_tissue = std::make_shared<Muscles>();
         assert(m_tissue->cells_count() == 10);
-        assert(m_tissue->blood_cells_count() == 10);
+        assert(m_tissue->ts_cells_count() == 10);
 
         std::vector<std::unique_ptr<DefaultEnergySource>> nuts;
         for (size_t i = 0; i < 10; ++i) {
             nuts.push_back(std::unique_ptr<Protein>(std::make_unique<Protein>()));
         }
-        m_tissue->feed(nuts);
-
-        m_tissue->shrink();
-        m_tissue->relax();
+        m_tissue->get_nuts(nuts);
+        m_tissue->feed();
 
         std::vector<Oxygen> o_pool = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
         m_tissue->get_oxygen(o_pool);
         m_tissue->breath();
 
+        m_tissue->shrink();
+        m_tissue->relax();
+
         for (size_t i = 0; i < 10; ++i)
             nuts.push_back(std::unique_ptr<Protein>(std::make_unique<Protein>()));
         assert(nuts.size() == 10);
-
-        m_tissue->get_nuts(nuts);
-        assert(nuts.size() == 0);
-        
 
         std::cout << "\t:complete\n";
     }
