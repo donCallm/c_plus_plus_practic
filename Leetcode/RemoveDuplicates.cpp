@@ -36,21 +36,21 @@
 */
 
 class Solution {
-    public:
-        int removeDuplicates(std::vector<int>& nums) {
-            std::unordered_map<int, int> exclusive;
-            std::vector<int> order;
-            for(auto num : nums) {
-                if (exclusive.find(num) == exclusive.end()) {
-                    order.push_back(num);
-                    exclusive.insert({num, num});
-                }
+public:
+    int removeDuplicates(std::vector<int>& nums) {
+        std::unordered_map<int, int> exclusive;
+        std::vector<int> order;
+        for(auto num : nums) {
+            if (exclusive.find(num) == exclusive.end()) {
+                order.push_back(num);
+                exclusive.insert({num, num});
             }
-            int k = order.size();
-            for(size_t i = 0; i < order.size(); ++i) {
-                nums[i] = order[i];
-            }
-    
-            return k;
         }
-    };
+        int k = order.size();
+        for(size_t i = 0; i < order.size(); ++i) {
+            nums[i] = order[i];
+        }
+
+        return k;
+    }
+};

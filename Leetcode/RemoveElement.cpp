@@ -36,20 +36,20 @@
 */
 
 class Solution {
-    public:
-        int removeElement(std::vector<int>& nums, int val) {
-            std::vector<int> store;
-            store.reserve(nums.size());
-            for(size_t i = 0; i < nums.size(); ++i) {
-                if (nums[i] != val) {
-                    store.push_back(nums[i]);
-                }
+public:
+    int removeElement(std::vector<int>& nums, int val) {
+        std::vector<int> store;
+        store.reserve(nums.size());
+        for(size_t i = 0; i < nums.size(); ++i) {
+            if (nums[i] != val) {
+                store.push_back(nums[i]);
             }
-    
-            for(size_t i = 0; i < store.size(); ++i) {
-                nums[i] = store[i];
-            }
-    
-            return store.size();
         }
-    };
+
+        for(size_t i = 0; i < store.size(); ++i) {
+            nums[i] = store[i];
+        }
+
+        return store.size();
+    }
+};
