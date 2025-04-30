@@ -1,4 +1,7 @@
 #include <iostream>
+#include <vector>
+#include <cxxabi.h>
+#include <boost/type_index.hpp> 
 
 namespace TemplateType {
     template <typename T>
@@ -91,5 +94,76 @@ namespace AutoType {
 
         // f({27}) - Error: cannot infer type
         f4({27});               // std::initializer_list<int>
+    }
+}
+
+namespace Decltype {
+    void auth() {}
+    
+    template<typename Container, typename Index>
+    auto authAndAccess(Container& c, Index i) // trailing return type
+        -> decltype(c[i])
+    /*
+        it is not possible to declare the return type at the beginning,
+        since the type is not yet defined, and if you specify it after,
+        the types will already be defined
+        C++ 11
+    */
+    {
+        auth();
+        return c[i];
+    }
+
+    template<typename C, typename I>
+    auto authAndAccess2(C& c, I i) {
+        auth();
+        return c[i]; // the return type is inferred here, C++ 14
+    }
+
+    template<typename C, typename I>
+    decltype(auto) authAndAccess3(C& c, I i) {
+        auth();
+        return c[i]; // the return type is inferred here, but with decltype rules, C++ 14
+    }
+
+    template<typename C, typename I>
+    decltype(auto) authAndAccess4(C&& c, I i) {
+        auth();
+        return std::forward<C>(c)[i]; // C++ 14
+    }
+
+    template<typename C, typename I>
+    auto authAndAccess4(C&& c, I i)
+        -> decltype(std::forward<C>(c)[i])
+    {
+        auth();
+        return std::forward<C>(c)[i]; // C++ 14
+    }
+
+    decltype(auto) ub() {
+        int x;
+        return (x);
+    }
+
+    void test() {
+        const int i = 0;
+        decltype(i); // - const int
+
+        std::vector<int> v(10);
+        authAndAccess(v, 5) = 10; // Ok, return type int&
+        // authAndAccess2(v, 2) = 10; Error, return type int
+        authAndAccess3(v, 2) = 10; // Ok
+
+        int a;
+        const int& ca = a;
+
+        auto test1 = ca;           // type is int
+        decltype(auto) test2 = ca; // type is const int&
+
+        decltype((a)); // - int&, an expression more complex than just a name
+        ub(); // return & to local variable
+
+        typeid(i).name(); // in this example type is ok, but typeid can return wrang type. Use Boost.Typeindex
+        boost::typeindex::type_id_with_cvr<int>().pretty_name();
     }
 }
