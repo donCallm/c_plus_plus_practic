@@ -167,3 +167,90 @@ namespace DeleteFunc {
     template <>
     void foo1<char>(char*) = delete;
 }
+
+namespace OverrideFunc {
+    class Base {
+        public:
+            virtual void doWork() {}
+    };
+    class Derived: public Base {
+        public:
+            virtual void doWrk() {}
+    };
+
+    class Widget {
+        public:
+            void doWork() & {}
+            void doWork() && {}
+    };
+    Widget make_widget() { return Widget{}; }
+
+    class Base2 {
+        public:
+            virtual void mf1() const {}
+            virtual void mf2(int x) {}
+            virtual void mf3() & {}
+            void mf4() const {}
+    };
+    class Derived2: public Base2 {
+        public:
+            virtual void mf1() {} // not overrided - lost const
+            virtual void mf2(unsigned int x) {} // not overrided - other type
+            virtual void mf3() && {} // not overrided - in base func for lvalue
+            void mf4() const {} // not overrided - in base it non-virtual
+    }; // but this code can be compiled
+    /*
+        class Derived3: public Base2 {
+            public:
+                void mf1() override {}
+                void mf2(unsigned int x) override {}
+                void mf3() && override {}
+                void mf4() const override {}
+        };
+        this code cant be compiled
+    */
+
+    class Widget1 {
+        public:
+            using DataType = std::vector<double>;
+
+            DataType& data() { return values; }
+
+        private:
+            DataType values;
+    };
+    Widget1 make_widget1() { return Widget1{}; }
+
+    class Widget2 {
+        public:
+            using DataType = std::vector<double>;
+
+            DataType& data() & { return values; }
+            DataType&& data() && { return std::move(values); }
+
+        private:
+            DataType values;
+    };
+    Widget2 make_widget2() { return Widget2{}; }
+
+    void test() {
+        std::unique_ptr<Base> upd = std::make_unique<Derived>();
+        upd->doWork(); // Derived::doWork
+
+        Widget w;
+        w.doWork(); // doWork() &
+        make_widget().doWork(); // doWork() &&
+
+        Widget1 w1;
+        // Copy - we return lvalue and call copy constructor
+        auto vals1 = w1.data();
+
+        // Copy - make_widget return rvalue, but data
+        // return lvalue and call copy constructor
+        auto vals2 = make_widget1().data(); 
+
+        Widget2 w2;
+        auto valt1 = w2.data(); // Copy
+        auto valt2 = make_widget2().data(); // Move
+    }
+}
